@@ -104,7 +104,10 @@ h1,h2,h3{font-family:var(--fd);line-height:1.2;text-wrap:balance;margin:0}
 /* dock */
 .dock{display:grid;grid-template-columns:118px minmax(0,1fr) minmax(0,1.05fr);gap:10px;align-items:center;padding:10px}
 .gatebox{display:grid;gap:2px;justify-items:center}
-#gate{width:118px;height:auto;display:block}
+#gate{width:118px;height:auto;display:block;touch-action:none;-webkit-user-select:none;user-select:none}
+.dock{touch-action:manipulation}
+.pcol{display:grid;gap:6px;min-width:0}
+.plock{justify-self:stretch;text-align:center}
 #gate .slot{stroke:var(--line);stroke-width:16;stroke-linecap:round;fill:none}
 #gate .slot-in{stroke:var(--panel2);stroke-width:9;stroke-linecap:round;fill:none}
 .gs{cursor:pointer;outline:none}
@@ -279,9 +282,10 @@ footer{margin-top:18px;text-align:center;color:var(--mute);font-size:12.5px}
       <div id="minis"></div>
       <div class="tip" id="tip" hidden></div>
       <div class="bayctl">
-        <button class="chip" id="cCase" type="button" aria-pressed="true">🧊 કેસિંગ</button>
+        <button class="chip" id="cCase" type="button">✂️ કટઅવે</button>
+        <button class="chip" id="cExp" type="button" aria-pressed="false">💥 છૂટું</button>
         <button class="chip" id="cLab" type="button" aria-pressed="true">🏷 લેબલ</button>
-        <button class="chip" id="cFlow" type="button" aria-pressed="true">⚡ પાવર ફ્લો</button>
+        <button class="chip" id="cFlow" type="button" aria-pressed="false">⚡ પાવર ફ્લો</button>
         <button class="chip" id="cTeach" type="button" aria-pressed="false">🎨 રંગ</button>
         <button class="chip" id="cSlow" type="button" aria-pressed="false">🐢 ધીમી ગતિ</button>
         <button class="chip" id="cSpin" type="button" aria-pressed="false">🔄 ફેરવો</button>
@@ -300,11 +304,11 @@ footer{margin-top:18px;text-align:center;color:var(--mute);font-size:12.5px}
         </svg>
         <div class="dlab">ગિયર લીવર</div>
       </div>
-      <div class="pedals">
+      <div class="pcol"><div class="pedals">
         <button class="pedal" id="pClutch" type="button"><span class="fill"></span><span class="grip"></span><span class="lbl">ક્લચ</span><span class="pct">0%</span></button>
         <button class="pedal" id="pBrake" type="button"><span class="fill"></span><span class="grip"></span><span class="lbl">બ્રેક</span><span class="pct">0%</span></button>
         <button class="pedal" id="pGas" type="button"><span class="fill"></span><span class="grip"></span><span class="lbl">રેસ</span><span class="pct">0%</span></button>
-      </div>
+      </div><button class="chip plock" id="cLock" type="button" aria-pressed="false">📌 ક્લચ લૉક (દબાયેલો રાખો)</button></div>
       <div class="gauges">
         <svg id="tach" viewBox="0 0 120 92" aria-label="એન્જિન rpm"></svg>
         <div class="ro"><span class="k">ઝડપ</span><span class="v" id="rSpd">0<small>km/h</small></span></div>
@@ -504,7 +508,7 @@ function shift(dt){
   else if(s.phase==='grind'){s.grindT-=dt;s.sleeve[G.hub]=CONTACT*G.side+(Math.random()-.5)*.04;if(Math.random()<dt*14)SND.grind();if(s.grindT<=0)toN();}
 }
 function inputs(dt){
-  const pT=s.pDemo??(s.pHold?1:0);s.p=s.p<pT?Math.min(pT,s.p+4*dt):Math.max(pT,s.p-.65*dt);
+  const pT=s.pDemo??((s.pHold||CLOCK)?1:0);s.p=s.p<pT?Math.min(pT,s.p+4*dt):Math.max(pT,s.p-.65*dt);
   const tT=s.running?(s.thDemo??(s.gHold?1:0)):0;s.th=s.th<tT?Math.min(tT,s.th+1.6*dt):Math.max(tT,s.th-4*dt);
   const bT=s.bHold?1:0;s.brake=s.brake<bT?Math.min(1,s.brake+4*dt):Math.max(0,s.brake-6*dt);
 }
@@ -555,159 +559,385 @@ function lathe(pts,seg){const g=new THREE.LatheGeometry(pts.map(p=>new THREE.Vec
 function cylX(r,len,seg,r2){const g=new THREE.CylinderGeometry(r2??r,r,len,seg||32);g.rotateZ(-Math.PI/2);return g;}
 function ring(rIn,rOut,w,seg){const h=w/2;return lathe([[rIn,-h],[rOut,-h],[rOut,h],[rIn,h],[rIn,-h]],seg);}
 
-/* ---------------- materials ---------------- */
-const MATS={
-  steel:{color:0xc3cbd2,metalness:.9,roughness:.28},
-  bright:{color:0xdfe5ea,metalness:.95,roughness:.18},
-  dark:{color:0x737e88,metalness:.85,roughness:.42},
-  shaft:{color:0xaab4bd,metalness:.92,roughness:.22},
-  brass:{color:0xd29a3a,metalness:.95,roughness:.3},
-  friction:{color:0x5a3d2b,metalness:.05,roughness:.95},
-  fork:{color:0x4f5a66,metalness:.6,roughness:.5},
-  black:{color:0x30353b,metalness:.5,roughness:.6},
-  spring:{color:0x9aa3ab,metalness:.9,roughness:.3},
-  sleeve:{color:0xb5c1ca,metalness:.92,roughness:.2},
+/* ---------------- procedural textures ---------------- */
+function cvTex(w,h,draw,rep){const c=document.createElement('canvas');c.width=w;c.height=h;draw(c.getContext('2d'),w,h);const t=new THREE.CanvasTexture(c);t.encoding=THREE.sRGBEncoding;t.anisotropy=4;if(rep){t.wrapS=t.wrapT=THREE.RepeatWrapping;t.repeat.set(rep,rep);}return t;}
+function speck(g,w,h,n,cols,sz){for(let i=0;i<n;i++){g.fillStyle=cols[i%cols.length];g.globalAlpha=Math.random()*.5+.2;const r=Math.random()*sz+.6;g.fillRect(Math.random()*w,Math.random()*h,r,r);}g.globalAlpha=1;}
+const TEX={
+  alu:cvTex(256,256,(g,w,h)=>{g.fillStyle='#b8bdc1';g.fillRect(0,0,w,h);speck(g,w,h,6000,['#a3a9ae','#c9ced2','#979da2','#d4d8db'],2.2);},3),
+  iron:cvTex(256,256,(g,w,h)=>{g.fillStyle='#5a5e62';g.fillRect(0,0,w,h);speck(g,w,h,7000,['#4a4e52','#6c7074','#3e4245','#7a7e82'],2.2);},2),
+  // clutch facing: woven friction material, radial grooves, a ring groove and two rows of riveted holes
+  lining:cvTex(512,512,(g,w,h)=>{const c=w/2;g.fillStyle='#6e6252';g.fillRect(0,0,w,h);speck(g,w,h,11000,['#5b4f41','#857762','#4b4237','#9a8b71','#3f382f'],2.6);
+    g.strokeStyle='rgba(30,24,18,.8)';g.lineWidth=6;for(let i=0;i<18;i++){const a=i/18*TAU;g.beginPath();g.moveTo(c+Math.cos(a)*c*.55,c+Math.sin(a)*c*.55);g.lineTo(c+Math.cos(a)*c,c+Math.sin(a)*c);g.stroke();}
+    g.lineWidth=4;g.beginPath();g.arc(c,c,c*.79,0,TAU);g.stroke();
+    for(const [rr,n,off] of [[.66,12,0],[.9,12,.5]])for(let i=0;i<n;i++){const a=(i+off)/n*TAU+.09;const x=c+Math.cos(a)*c*rr,y=c+Math.sin(a)*c*rr;
+      g.fillStyle='#231e18';g.beginPath();g.arc(x,y,10,0,TAU);g.fill();g.fillStyle='#b7ad9a';g.beginPath();g.arc(x,y,5,0,TAU);g.fill();g.fillStyle='#7d7465';g.beginPath();g.arc(x,y,2,0,TAU);g.fill();}}),
+  // gear-knob top with the H shift pattern
+  knob:cvTex(256,256,(g,w,h)=>{g.fillStyle='#121314';g.fillRect(0,0,w,h);g.strokeStyle='#ececec';g.lineWidth=8;g.lineCap='round';g.beginPath();
+    [[72,74,72,182],[128,74,128,182],[184,74,184,182],[72,128,184,128]].forEach(([a,b,c2,d])=>{g.moveTo(a,b);g.lineTo(c2,d);});g.stroke();
+    g.fillStyle='#ececec';g.font='bold 34px sans-serif';g.textAlign='center';g.textBaseline='middle';
+    [['1',72,46],['3',128,46],['5',184,46],['2',72,212],['4',128,212],['R',184,212]].forEach(([t,x,y])=>g.fillText(t,x,y));}),
 };
-function mat(k){const m=new THREE.MeshStandardMaterial(MATS[k]);m.userData.base={...MATS[k]};return m;}
-const caseMat=new THREE.MeshStandardMaterial({color:0xcfd8df,metalness:.3,roughness:.4,transparent:true,opacity:.13,depthWrite:false,side:THREE.DoubleSide});
-const caseEdge=new THREE.LineBasicMaterial({color:0x7d8a96,transparent:true,opacity:.45});
+
+/* ---------------- materials (original colours) ---------------- */
+const MATS={
+  gear:{color:0xb5bcc2,metalness:.92,roughness:.3},       // hardened gear steel
+  steel:{color:0xc0c7cd,metalness:.9,roughness:.3},
+  bright:{color:0xdfe4e8,metalness:.96,roughness:.15},     // ground bearing races, rails, balls
+  shaft:{color:0xc6ccd2,metalness:.95,roughness:.2},
+  dark:{color:0x6c747b,metalness:.85,roughness:.42},
+  brass:{color:0xc99a3b,metalness:.95,roughness:.28},      // synchro blocker rings
+  iron:{color:0xffffff,metalness:.55,roughness:.62,map:TEX.iron},   // cast iron
+  machined:{color:0xd3d7da,metalness:.92,roughness:.2},    // machined friction faces
+  paint:{color:0x1c1e21,metalness:.35,roughness:.5},       // black painted pressed steel
+  rubber:{color:0x131313,metalness:0,roughness:.88},
+  plastic:{color:0x1b1c1e,metalness:.05,roughness:.55},
+  blued:{color:0x2a3441,metalness:.85,roughness:.32},      // spring steel: circlips, diaphragm
+  zinc:{color:0xadb3b8,metalness:.85,roughness:.35},       // zinc-plated bolts
+  yzinc:{color:0xc6b062,metalness:.85,roughness:.35},      // yellow-zinc plated clutch-disc plates
+  lining:{color:0xffffff,metalness:.05,roughness:.92,map:TEX.lining},
+  liningEdge:{color:0x5e5345,metalness:.05,roughness:.92},
+  alu:{color:0xffffff,metalness:.5,roughness:.55,map:TEX.alu},      // cast aluminium casing
+  fork:{color:0x8a8f93,metalness:.8,roughness:.42},
+  nylon:{color:0x262626,metalness:0,roughness:.6},
+  cream:{color:0xe7e0ca,metalness:0,roughness:.5},         // plastic speedo gear
+  spring:{color:0x9aa2a9,metalness:.9,roughness:.3},
+  copper:{color:0xb87333,metalness:.9,roughness:.35},
+  leather:{color:0x161718,metalness:.1,roughness:.75},
+  chrome:{color:0xe8ecef,metalness:1,roughness:.08},
+};
+function mat(k,extra){const m=new THREE.MeshStandardMaterial(Object.assign({},MATS[k],extra||{}));m.userData.base={color:MATS[k].color,metalness:MATS[k].metalness,roughness:MATS[k].roughness};return m;}
+// casing materials can be cut away (front half clipped) or made see-through
+renderer.localClippingEnabled=true;
+const CLIP=[new THREE.Plane(new THREE.Vector3(0,0,-1),0)];
+const CASEMATS=[];
+function cmat(k){const m=mat(k,{side:THREE.DoubleSide});CASEMATS.push(m);return m;}
+const oilMat=new THREE.MeshStandardMaterial({color:0xa86e12,metalness:0,roughness:.12,transparent:true,opacity:.5,depthWrite:false,side:THREE.DoubleSide});
+const caseEdge=new THREE.LineBasicMaterial({color:0x6f7b86,transparent:true,opacity:.5});
 
 /* ---------------- parts registry ---------------- */
+const PGROUPS=[['eng','⚙️ એન્જિન બાજુ'],['clutch','🦶 ક્લચ'],['shaft','➖ શાફ્ટ'],['gear','⚙ ગિયર'],['sync','🔁 સિંક્રોનાઇઝર'],['sel','🕹 લીવર અને સિલેક્ટર'],['brg','🔘 બેરિંગ, સીલ, ક્લિપ'],['case','🧰 કેસિંગ અને બીજા ભાગ']];
 const PARTS={};
-function P(id,n,sub,c,d,rows){PARTS[id]={id,n,sub,c,d,rows,meshes:[]};}
+function P(id,grp,n,sub,c,d,rows){PARTS[id]={id,grp,n,sub,c,d,rows:rows||[],meshes:[]};}
 const pickables=[];
-function add(parent,partId,geo,mk,x,y,z,tags){const m=new THREE.Mesh(geo,mk);m.position.set(x||0,y||0,z||0);m.castShadow=true;m.receiveShadow=true;
-  m.userData.part=partId;m.userData.tags=tags||[];if(partId){PARTS[partId].meshes.push(m);pickables.push(m);}parent.add(m);return m;}
+function add(parent,partId,geo,mk,x,y,z,tags,noShadow){const m=new THREE.Mesh(geo,mk);m.position.set(x||0,y||0,z||0);m.castShadow=!noShadow;m.receiveShadow=true;
+  m.userData.part=partId;m.userData.tags=tags||[];if(partId){PARTS[partId].meshes.push(m);if(partId!=='oil')pickables.push(m);}parent.add(m);return m;}
+// many identical small pieces (balls, needles, bolts) as one instanced mesh
+function inst(parent,partId,geo,mk,list,tags){const im=new THREE.InstancedMesh(geo,mk,list.length);const o=new THREE.Object3D();
+  list.forEach((t,i)=>{o.position.set(t[0],t[1],t[2]);o.rotation.set(t[3]||0,t[4]||0,t[5]||0);o.updateMatrix();im.setMatrixAt(i,o.matrix);});
+  im.castShadow=false;im.receiveShadow=true;im.userData.part=partId;im.userData.tags=tags||[];PARTS[partId].meshes.push(im);pickables.push(im);parent.add(im);return im;}
+// exploded view: each registered object moves by its offset × explode amount (plus any live offset d)
+const EXO=[];let EXP=0,EXP_T=0;
+function ex(o,dx,dy,dz){o.userData.b=o.position.clone();o.userData.o=new THREE.Vector3(dx||0,dy||0,dz||0);o.userData.d=new THREE.Vector3();EXO.push(o);return o;}
+function grp(parent,x,y,z){const g=new THREE.Group();g.position.set(x||0,y||0,z||0);parent.add(g);return g;}
+class Helix extends THREE.Curve{constructor(r,len,turns){super();this.r=r;this.len=len;this.turns=turns;}
+  getPoint(t,v=new THREE.Vector3()){const a=t*this.turns*TAU;return v.set(this.r*Math.cos(a),this.r*Math.sin(a),this.len*(t-.5));}}
+const springGeo=(r,len,turns,wire)=>new THREE.TubeGeometry(new Helix(r,len,turns),turns*14,wire,6,false);
+const hexX=(r,h)=>cylX(r,h,6);
+// flat annulus facing ±X with planar UVs (for the textured clutch facing)
+function faceRing(rIn,rOut,dir){const g=new THREE.RingGeometry(rIn,rOut,72,1);g.rotateY(dir>0?Math.PI/2:-Math.PI/2);return g;}
 
-P('fly','ફ્લાયવ્હીલ','ક્લચ · એન્જિન બાજુ','var(--mute)','એન્જિનના ક્રેન્કશાફ્ટ પર બોલ્ટ થયેલું ભારે ચક્ર. તેની સપાટી પર ક્લચ પ્લેટ દબાય છે. કિનારે સ્ટાર્ટર મોટર માટે રિંગ ગિયર છે.',[['મટીરિયલ','કાસ્ટ આયર્ન / સ્ટીલ'],['ઝડપ','એન્જિન જેટલી'],['કામ','ઊર્જા સંગ્રહ કરી એન્જિનને સરળ ફેરવે']]);
-P('disc','ક્લચ પ્લેટ (ડિસ્ક)','ક્લચ','var(--slv)','બંને બાજુ ઘર્ષણ લાઇનિંગવાળી પ્લેટ. તેનું હબ ઇનપુટ શાફ્ટની સ્પ્લાઇન પર સરકે છે. વચ્ચેની ટૉર્શનલ સ્પ્રિંગ ઝટકા શોષે છે.',[['લાઇનિંગ','ઘર્ષણ મટીરિયલ (નોન-એસ્બેસ્ટોસ)'],['ખામી','લાઇનિંગ ઘસાય તો ક્લચ સ્લિપ થાય'],['ઝડપ','ઇનપુટ શાફ્ટ જેટલી']]);
-P('press','પ્રેશર પ્લેટ','ક્લચ','var(--slv)','ડાયાફ્રામ સ્પ્રિંગના દબાણથી ક્લચ પ્લેટને ફ્લાયવ્હીલ સામે દબાવે છે. પેડલ દબાવતાં તે પાછળ ખસે અને પ્લેટ છૂટી પડે છે.',[['સ્પ્રિંગ','ડાયાફ્રામ (કપ આકારની)'],['ઝડપ','એન્જિન જેટલી'],['ખામી','સ્પ્રિંગ નબળી પડે તો ક્લચ સ્લિપ']]);
-P('rel','રિલીઝ બેરિંગ','ક્લચ','var(--slv)','પેડલ દબાવતાં ક્લચ ફોર્ક તેને આગળ ધકેલે છે. તે ડાયાફ્રામ સ્પ્રિંગની આંગળીઓ દબાવી પ્રેશર પ્લેટ પાછી ખેંચે છે.',[['પ્રકાર','થ્રસ્ટ બૉલ બેરિંગ'],['ખામી','ક્લચ દબાવતાં ચીં-ચીં અવાજ']]);
-P('input','ઇનપુટ શાફ્ટ','ગિયરબોક્સ · ક્લચ શાફ્ટ','var(--acc)','ક્લચ પ્લેટથી પાવર ગિયરબોક્સમાં લાવે છે. તેના પર સ્પ્લાઇન છે જેના પર ક્લચ પ્લેટ સરકે છે.',[['બીજાં નામ','ક્લચ શાફ્ટ, પ્રાઇમરી શાફ્ટ'],['ઝડપ','ક્લચ છૂટો હોય ત્યારે એન્જિન જેટલી']]);
-P('ingear','ઇનપુટ ડ્રાઇવ ગિયર (ગિયર 4)','ઇનપુટ શાફ્ટ · 18 દાંત','var(--g4)','ઇનપુટ શાફ્ટનો ભાગ. તે કાઉન્ટર શાફ્ટના 32 દાંતના ગિયરને સતત ફેરવે છે. ચોથા ગિયરમાં સ્લીવ આ ગિયરના ડૉગ દાંતને સીધો મુખ્ય શાફ્ટ સાથે જોડે છે, એટલે 1 : 1 (ડાયરેક્ટ ડ્રાઇવ).',[['દાંત','18 (હેલિકલ)'],['મેશ','કાઉન્ટર શાફ્ટ ગિયર 32 દાંત'],['રેશિયો','32 ÷ 18 = 1.78 (ઘટાડો)']]);
-P('counter','કાઉન્ટર શાફ્ટ (લે શાફ્ટ)','ગિયર ક્લસ્ટર','var(--acc)','બધા ગિયર એક જ ટુકડામાં બનેલા છે. ઇનપુટ ગિયરથી ફરે છે અને મુખ્ય શાફ્ટ પરના દરેક ગિયરને સતત ફેરવે છે (કૉન્સ્ટન્ટ મેશ).',[['દાંત','32 · 27 · 23 · 16 · 34 · 14 (R)'],['દિશા','ઇનપુટથી ઊલટી'],['ઝડપ','ઇનપુટ × 18/32']]);
-P('main','મુખ્ય શાફ્ટ (આઉટપુટ શાફ્ટ)','ગિયરબોક્સ','var(--acc)','તેના પર ગિયર સોય બેરિંગ પર છૂટા ફરે છે અને સિંક્રો હબ સ્પ્લાઇનથી જડેલા છે. પાછળનો છેડો પ્રોપેલર શાફ્ટ દ્વારા વ્હીલ સુધી જાય છે.',[['ઝડપ','ગાડીની ઝડપ પ્રમાણે'],['આગળનો છેડો','ઇનપુટ ગિયરમાં પાઇલટ બેરિંગ પર']]);
-for(const id of ['1','2','3','5','R']){const g=GD[id];P('g'+id,id==='R'?'રિવર્સ ગિયર':'ગિયર '+id+' ('+g.n+')','મુખ્ય શાફ્ટ · '+g.Zm+' દાંત','var(--g'+id+')',
-  'મુખ્ય શાફ્ટ પર સોય બેરિંગ પર છૂટો ફરે છે. '+(id==='R'?'કાઉન્ટર શાફ્ટના '+g.Zc+' દાંતના ગિયરથી આઇડલર ગિયર દ્વારા ફરે છે, એટલે દિશા ઊલટી.':'કાઉન્ટર શાફ્ટના '+g.Zc+' દાંતના ગિયર સાથે સતત મેશમાં.')+' સ્લીવ તેના ડૉગ દાંતમાં ભરાય ત્યારે જ તે શાફ્ટને ફેરવે છે.',
+const gtxt=id=>id==='R'?'રિવર્સ':GD[id].n;
+P('block','eng','એન્જિન બ્લૉક (પાછળનો ભાગ)','કાસ્ટ આયર્ન','var(--mute)','એન્જિનનો પાછળનો ભાગ. ગિયરબોક્સનું બેલ હાઉસિંગ અહીં ડોવેલ અને બોલ્ટથી જોડાય છે. અંદર ક્રેન્કશાફ્ટનો પાછળનો છેડો અને ઓઇલ સીલ હોય છે.',[['રંગ','કાસ્ટ આયર્ન ગ્રે']]);
+P('crank','eng','ક્રેન્કશાફ્ટ ફ્લેન્જ','એન્જિન','var(--mute)','ક્રેન્કશાફ્ટનો પાછળનો છેડો. તેના પર ફ્લાયવ્હીલ બોલ્ટ થાય છે અને વચ્ચે પાઇલટ બેરિંગ હોય છે.',[['ઝડપ','એન્જિન rpm']]);
+P('fly','eng','ફ્લાયવ્હીલ','ક્લચ · એન્જિન બાજુ','var(--mute)','ક્રેન્કશાફ્ટ પર બોલ્ટ થયેલું ભારે કાસ્ટ આયર્ન ચક્ર. તેની ચમકતી મશીન કરેલી સપાટી પર ક્લચ પ્લેટ દબાય છે. તે ઊર્જા સંગ્રહ કરી એન્જિનને સરળ ફેરવે છે.',[['મટીરિયલ','કાસ્ટ આયર્ન'],['ઘર્ષણ સપાટી','મશીન કરેલી, ગ્રીસ/તેલ વગર સાફ'],['ખામી','ગરમીથી તિરાડ કે વાંકું થાય તો ક્લચ ધ્રૂજે']]);
+P('ringgear','eng','રિંગ ગિયર (સ્ટાર્ટર)','ફ્લાયવ્હીલની કિનારી','var(--mute)','ફ્લાયવ્હીલ પર ગરમ કરીને ચડાવેલો (શ્રિંક-ફિટ) દાંતાવાળો રિંગ. સ્ટાર્ટર મોટરનો પિનિયન તેને ફેરવી એન્જિન ચાલુ કરે છે.',[['દાંત','118'],['મટીરિયલ','હાર્ડન સ્ટીલ']]);
+P('flybolt','eng','ફ્લાયવ્હીલ બોલ્ટ','6 નંગ','var(--mute)','ફ્લાયવ્હીલને ક્રેન્કશાફ્ટ ફ્લેન્જ સાથે જકડે છે. ખોલ્યા પછી નવા બોલ્ટ વાપરવા અને સર્વિસ મૅન્યુઅલ મુજબ ટૉર્કથી ક્રૉસ ક્રમમાં કસવા.');
+P('dowel','eng','ડોવેલ પિન','ફ્લાયવ્હીલ પર','var(--mute)','ક્લચ કવરને ફ્લાયવ્હીલ પર બરાબર મધ્યમાં બેસાડે છે, જેથી ફરતી વખતે અસંતુલન ન આવે.');
+P('pilot','eng','પાઇલટ બેરિંગ','ક્રેન્કશાફ્ટના છેડે','var(--mute)','ઇનપુટ શાફ્ટનો આગળનો છેડો અહીં ટેકવાય છે. ક્લચ દબાવીએ ત્યારે ઇનપુટ શાફ્ટ અને ક્રેન્ક જુદી ઝડપે ફરે છે.',[['ખામી','ઘસાય તો ક્લચ દબાવતાં કિચૂડ અવાજ']]);
+P('starter','eng','સ્ટાર્ટર મોટર','બેલ હાઉસિંગ પર','var(--mute)','ચાવી ફેરવતાં ઉપરનો સોલેનોઇડ પિનિયનને આગળ ધકેલે છે; પિનિયન રિંગ ગિયરને ફેરવે છે અને એન્જિન ચાલુ થાય છે.',[['ભાગ','મોટર, સોલેનોઇડ, પિનિયન'],['ટર્મિનલ','બૅટરી (+) અને S']]);
+P('disc','clutch','ક્લચ પ્લેટ (ડિસ્ક)','ક્લચ','var(--slv)','ફ્લાયવ્હીલ અને પ્રેશર પ્લેટ વચ્ચે દબાતી પ્લેટ. બંને બાજુ ઘર્ષણ લાઇનિંગ, વચ્ચે કુશન પ્લેટ, પીળા ઝિંક પ્લેટવાળી સાઇડ પ્લેટ અને ડૅમ્પર સ્પ્રિંગ હોય છે.',[['ઝડપ','ઇનપુટ શાફ્ટ જેટલી'],['ખામી','ઘસાય તો ક્લચ સ્લિપ; વાંકી હોય તો ક્લચ ડ્રેગ']]);
+P('lining','clutch','ઘર્ષણ લાઇનિંગ (ફેસિંગ)','ક્લચ પ્લેટ · બંને બાજુ','var(--slv)','પ્લેટની બંને બાજુ રિવેટથી જડેલી ઘર્ષણ સામગ્રી. તે દબાઈને પાવર લઈ જાય છે. ખાંચા ધૂળ અને ગરમી બહાર કાઢે છે.',[['ઘસારો','રિવેટના માથા સુધી ઘસાય તો બદલો'],['ખામી','તેલ લાગે તો સ્લિપ, બળેલી ગંધ']]);
+P('damper','clutch','ટૉર્શનલ ડૅમ્પર સ્પ્રિંગ','ક્લચ પ્લેટ · 6 નંગ','var(--slv)','હબ અને સાઇડ પ્લેટ વચ્ચેની કૉઇલ સ્પ્રિંગ. ક્લચ પકડે ત્યારે ઝટકો અને એન્જિનનું કંપન શોષે છે. સ્ટૉપ પિન તેને વધુ દબાવા દેતી નથી.',[['સંખ્યા','6 સ્પ્રિંગ + 6 સ્ટૉપ પિન'],['ખામી','તૂટે તો ખડખડ અવાજ']]);
+P('dischub','clutch','ક્લચ પ્લેટ હબ','સ્પ્લાઇન બોર','var(--slv)','અંદર સ્પ્લાઇન છે જે ઇનપુટ શાફ્ટ પર સરકે છે. પ્લેટ શાફ્ટને ફેરવી શકે અને આગળ-પાછળ ખસી પણ શકે.',[['ખામી','સ્પ્લાઇન ઘસાય/કાટ લાગે તો ક્લચ પૂરો ન છૂટે']]);
+P('press','clutch','પ્રેશર પ્લેટ','ક્લચ કવરની અંદર','var(--slv)','કાસ્ટ આયર્નની ભારે રિંગ. ડાયાફ્રામ સ્પ્રિંગ તેને ક્લચ પ્લેટ પર દબાવે છે. પેડલ દબાવતાં તે પાછળ ખસે છે.',[['સપાટી','મશીન કરેલી'],['ખામી','ગરમીથી ભૂરા/વાદળી ડાઘ, તિરાડ']]);
+P('diaphragm','clutch','ડાયાફ્રામ સ્પ્રિંગ','ક્લચ કવરની અંદર · 18 આંગળીઓ','var(--slv)','કપ આકારની સ્પ્રિંગ સ્ટીલ ડિસ્ક. બહારની કિનારી પ્રેશર પ્લેટને દબાવે છે. રિલીઝ બેરિંગ આંગળીઓ દબાવે ત્યારે તે લિવરની જેમ પ્રેશર પ્લેટ છોડી દે છે.',[['ખામી','આંગળીઓ અસમાન કે ઘસાયેલી હોય તો ક્લચ પૂરો ન છૂટે']]);
+P('cover','clutch','ક્લચ કવર','પ્રેશર પ્લેટ એસેમ્બલી','var(--slv)','પ્રેસ કરેલા સ્ટીલનું કાળું કવર. 6 બોલ્ટથી ફ્લાયવ્હીલ પર લાગે છે અને અંદર ડાયાફ્રામ સ્પ્રિંગ અને પ્રેશર પ્લેટ પકડે છે.',[['બોલ્ટ','6, ક્રૉસ ક્રમમાં ધીમે ધીમે કસવા'],['ફિટિંગ','ક્લચ એલાઇનમેન્ટ ટૂલથી પ્લેટ મધ્યમાં રાખવી']]);
+P('strap','clutch','ડ્રાઇવ સ્ટ્રેપ','કવર ↔ પ્રેશર પ્લેટ','var(--slv)','પાતળી સ્પ્રિંગ સ્ટીલ પટ્ટીઓ. તે પ્રેશર પ્લેટને કવર સાથે ફેરવે છે અને છતાં આગળ-પાછળ ખસવા દે છે.',[['સંખ્યા','3 સેટ']]);
+P('rel','clutch','રિલીઝ બેરિંગ (થ્રો-આઉટ બેરિંગ)','ક્લચ','var(--slv)','પેડલ દબાવતાં ફોર્ક તેને આગળ ધકેલે છે. તે ડાયાફ્રામની ફરતી આંગળીઓ દબાવી પ્રેશર પ્લેટ પાછી ખેંચે છે.',[['પ્રકાર','સીલબંધ થ્રસ્ટ બૉલ બેરિંગ + પ્લાસ્ટિક કૅરિયર'],['ખામી','ક્લચ દબાવતાં ચીં-ચીં અવાજ']]);
+P('guide','clutch','ગાઇડ સ્લીવ','ફ્રન્ટ બેરિંગ રિટેનર','var(--slv)','ઇનપુટ શાફ્ટ ફરતેની નળી. રિલીઝ બેરિંગ તેના પર આગળ-પાછળ સરકે છે; ફિટ કરતી વખતે પાતળી ગ્રીસ લગાવવી.');
+P('relfork','clutch','ક્લચ રિલીઝ ફોર્ક','બેલ હાઉસિંગમાં','var(--slv)','બૉલ સ્ટડ પર ઝૂલતું લિવર. કેબલ ખેંચાય ત્યારે તે રિલીઝ બેરિંગને ડાયાફ્રામની આંગળીઓ તરફ ધકેલે છે.',[['પિવટ','બૉલ સ્ટડ, ગ્રીસ જરૂરી']]);
+P('cable','clutch','ક્લચ કેબલ','પેડલથી ફોર્ક સુધી','var(--slv)','ક્લચ પેડલની હલચલ ફોર્ક સુધી પહોંચાડે છે. કેટલીક ગાડીઓમાં કેબલને બદલે હાઇડ્રોલિક માસ્ટર અને સ્લેવ સિલિન્ડર હોય છે.',[['ઍડજસ્ટમેન્ટ','પેડલ ફ્રી પ્લે ઉત્પાદક મુજબ']]);
+P('input','shaft','ઇનપુટ શાફ્ટ','ક્લચ શાફ્ટ / પ્રાઇમરી શાફ્ટ','var(--acc)','ક્લચ પ્લેટથી પાવર ગિયરબોક્સમાં લાવે છે. આગળ સ્પ્લાઇન (ક્લચ પ્લેટ માટે), આગળનો છેડો પાઇલટ બેરિંગમાં અને પાછળ ડ્રાઇવ ગિયર.',[['ઝડપ','ક્લચ છોડેલો હોય ત્યારે એન્જિન જેટલી']]);
+P('main','shaft','મુખ્ય શાફ્ટ (આઉટપુટ શાફ્ટ)','ગિયરબોક્સ','var(--acc)','તેના પર ગિયર નીડલ બેરિંગ પર છૂટા ફરે છે અને સિંક્રો હબ સ્પ્લાઇનથી જડેલા છે. પાછળનો છેડો પ્રોપેલર શાફ્ટ દ્વારા વ્હીલ સુધી જાય છે.',[['ઝડપ','ગાડીની ઝડપ પ્રમાણે']]);
+P('counter','shaft','કાઉન્ટર શાફ્ટ (લે શાફ્ટ) અને ગિયર ક્લસ્ટર','ગિયર ક્લસ્ટર','var(--acc)','બધા ગિયર એક જ ટુકડામાં બનેલા છે. ઇનપુટ ગિયરથી ફરે છે અને મુખ્ય શાફ્ટ પરના દરેક ગિયરને સતત ફેરવે છે (કૉન્સ્ટન્ટ મેશ). નીચેનો ભાગ ઓઇલમાં ડૂબી ઓઇલ ઉછાળે છે.',[['દાંત','32 · 27 · 23 · 16 · 34 · 14 (R)'],['દિશા','ઇનપુટથી ઊલટી']]);
+P('idlershaft','shaft','આઇડલર શાફ્ટ','રિવર્સ','var(--gR)','કેસિંગમાં જડેલો ટૂંકો સ્થિર શાફ્ટ. તેના પર રિવર્સ આઇડલર ગિયર ફરે છે.');
+P('ingear','gear','ઇનપુટ ડ્રાઇવ ગિયર (ગિયર 4)','ઇનપુટ શાફ્ટ · 18 દાંત','var(--g4)','ઇનપુટ શાફ્ટનો ભાગ. કાઉન્ટર શાફ્ટના 32 દાંતના ગિયરને સતત ફેરવે છે. ચોથા ગિયરમાં સ્લીવ તેના ડૉગ દાંતને સીધો મુખ્ય શાફ્ટ સાથે જોડે છે (1 : 1).',[['દાંત','18 હેલિકલ'],['રેશિયો','32 ÷ 18 = 1.78']]);
+for(const id of ['1','2','3','5','R']){const g=GD[id];P('g'+id,'gear',id==='R'?'રિવર્સ ગિયર':'ગિયર '+id+' ('+g.n+')','મુખ્ય શાફ્ટ · '+g.Zm+' દાંત','var(--g'+id+')',
+  'મુખ્ય શાફ્ટ પર નીડલ બેરિંગ પર છૂટો ફરે છે. '+(id==='R'?'કાઉન્ટર શાફ્ટના '+g.Zc+' દાંતના ગિયરથી આઇડલર દ્વારા ફરે છે, એટલે દિશા ઊલટી.':'કાઉન્ટર શાફ્ટના '+g.Zc+' દાંતના ગિયર સાથે સતત મેશમાં.')+' બાજુમાં કોન અને ડૉગ દાંત છે. સ્લીવ ડૉગ દાંતમાં ભરાય ત્યારે જ તે શાફ્ટને ફેરવે છે.',
   [['દાંત',g.Zm+(id==='R'?' (આઇડલર '+g.Zi+')':'')],['કુલ રેશિયો',Math.abs(g.r).toFixed(2)+' : 1'+(Math.abs(g.r)<1?' (ઓવરડ્રાઇવ)':'')],['ગણતરી','(32/18) × ('+g.Zm+'/'+g.Zc+')']]);}
-P('idler','આઇડલર ગિયર','રિવર્સ · 12 દાંત','var(--gR)','કાઉન્ટર શાફ્ટ અને રિવર્સ ગિયર વચ્ચે આવતો વધારાનો ગિયર. તે દિશા ઊલટાવે છે, તેથી મુખ્ય શાફ્ટ ઊંધો ફરે અને ગાડી પાછળ જાય. તેના દાંતની સંખ્યા રેશિયો બદલતી નથી.',[['દાંત','12'],['કામ','ફક્ત દિશા બદલવી']]);
-P('hub','સિંક્રો હબ','સિંક્રોનાઇઝર','var(--slv)','સ્પ્લાઇનથી મુખ્ય શાફ્ટ પર જડેલું હોય છે, એટલે હંમેશા શાફ્ટ સાથે ફરે છે. તેની બહારની સ્પ્લાઇન પર સ્લીવ સરકે છે. ખાંચામાં સ્ટ્રટ (કી) અને સ્પ્રિંગ હોય છે.',[['સંખ્યા','3 (1–2, 3–4, 5–R)'],['ઝડપ','મુખ્ય શાફ્ટ જેટલી']]);
-P('sleeve','સ્લીવ (કપ્લિંગ સ્લીવ)','સિંક્રોનાઇઝર','var(--slv)','હબ પર ડાબે-જમણે સરકે છે. પહેલા તે બ્લૉકર રિંગને ગિયરના કોન પર દબાવે છે. ઝડપ સરખી થાય પછી રિંગના દાંત વચ્ચેથી પસાર થઈ ગિયરના ડૉગ દાંતમાં ભરાય છે અને ગિયરને શાફ્ટ સાથે લૉક કરે છે.',[['અંદર','સ્પ્લાઇન દાંત (છેડે ત્રાંસા/ચેમ્ફર)'],['બહાર','ફોર્ક માટે ખાંચો'],['ખામી','દાંત ઘસાય તો ગિયર નીકળી જાય']]);
-P('ring','બ્લૉકર રિંગ (બૉક રિંગ)','સિંક્રોનાઇઝર · પિત્તળ','var(--brass)','સિંક્રોમેશનું હૃદય. અંદરની શંકુ સપાટી ગિયરના કોન પર ઘસાય અને ઘર્ષણથી ગિયરની ઝડપ શાફ્ટ જેટલી કરે. ઝડપ જુદી હોય ત્યાં સુધી તેના ત્રાંસા દાંત સ્લીવને આગળ જવા દેતા નથી, તેથી દાંત અથડાતા નથી.',[['મટીરિયલ','પિત્તળ / કાંસું'],['કોન પર','બારીક ખાંચા: ઓઇલની પરત કાપે'],['ખામી','ઘસાય તો ગિયર બદલતાં ઘરરર અવાજ']]);
-P('dog','ડૉગ દાંત અને કોન','દરેક ગિયરની બાજુ','var(--hl)','દરેક ગિયરની બાજુમાં નાનો શંકુ (કોન) અને નાના દાંતની રિંગ હોય છે. કોન પર બ્લૉકર રિંગ ઘસાય અને ડૉગ દાંતમાં સ્લીવ ભરાય.',[['દાંત','સ્લીવ જેટલી જ પિચ'],['ખામી','દાંતના છેડા ગોળ થાય તો ગિયર નીકળી જાય']]);
-P('fork','શિફ્ટ ફોર્ક','સિલેક્ટર','var(--mute)','સ્લીવના ખાંચામાં બેઠેલો U આકારનો ભાગ. લીવર ખસેડતાં રેલ સાથે ખસે અને સ્લીવને ગિયર તરફ ધકેલે છે.',[['સંખ્યા','3'],['છેડા','બ્રાસ/નાયલોન પૅડ'],['ખામી','વાંકો થાય તો ગિયર પૂરો ન લાગે']]);
-P('rail','શિફ્ટ રેલ (સિલેક્ટર રોડ)','સિલેક્ટર','var(--mute)','ફોર્કને પકડી રાખતા સળિયા. દરેક રેલમાં ડિટેન્ટ ખાંચા હોય છે જેમાં સ્પ્રિંગવાળી બૉલ બેસે છે, જેથી ગિયર ટકી રહે. ઇન્ટરલૉક પિન બે રેલ એકસાથે ખસવા દેતી નથી.',[['ડિટેન્ટ','બૉલ + સ્પ્રિંગ: ગિયર ટકાવે'],['ઇન્ટરલૉક','બે ગિયર એકસાથે નહીં']]);
-P('bear','બૉલ બેરિંગ','શાફ્ટનો આધાર','var(--mute)','કેસિંગની દીવાલમાં શાફ્ટને ટેકો આપે છે અને ઘર્ષણ ઘટાડે છે. ગિયર ઓઇલથી લ્યુબ્રિકેટ થાય છે.',[['ખામી','ઘસાય તો ગુંજન (હમ) અવાજ']]);
-P('flange','આઉટપુટ ફ્લેન્જ અને U-જૉઇન્ટ','પ્રોપેલર શાફ્ટ તરફ','var(--acc)','મુખ્ય શાફ્ટનો પાછળનો છેડો. અહીંથી પ્રોપેલર શાફ્ટ, ડિફરન્શિયલ અને એક્સલ દ્વારા પાવર વ્હીલ સુધી જાય છે.',[['ઝડપ','મુખ્ય શાફ્ટ જેટલી']]);
-P('case','ગિયરબોક્સ કેસિંગ','હાઉસિંગ','var(--mute)','એલ્યુમિનિયમ કે કાસ્ટ આયર્નનું બૉક્સ. શાફ્ટ અને બેરિંગને ટેકો આપે છે અને ગિયર ઓઇલ ભરી રાખે છે. આગળ બેલ હાઉસિંગમાં ક્લચ હોય છે.',[['ઓઇલ','GL-4, 75W-90 / 80W-90'],['લેવલ','ફિલર પ્લગની નીચલી ધાર સુધી']]);
+P('idler','gear','આઇડલર ગિયર','રિવર્સ · 12 દાંત','var(--gR)','કાઉન્ટર ગિયર અને રિવર્સ ગિયર વચ્ચે આવતો વધારાનો ગિયર. તે દિશા ઊલટાવે છે. તેના દાંત રેશિયો બદલતા નથી.',[['દાંત','12']]);
+P('hub','sync','સિંક્રો હબ','3 નંગ: 1–2, 3–4, 5–R','var(--slv)','સ્પ્લાઇનથી મુખ્ય શાફ્ટ પર જડેલું, હંમેશા શાફ્ટ સાથે ફરે છે. બહારની સ્પ્લાઇન પર સ્લીવ સરકે છે; તેના 3 ખાંચામાં સ્ટ્રટ બેસે છે.',[['ફિટિંગ','સર્કલિપથી શાફ્ટ પર પકડાયેલું']]);
+P('sleeve','sync','સ્લીવ (કપ્લિંગ સ્લીવ)','સિંક્રોનાઇઝર','var(--slv)','હબ પર સરકે છે. પહેલા બ્લૉકર રિંગને કોન પર દબાવે છે; ઝડપ સરખી થાય પછી રિંગના દાંત વચ્ચેથી પસાર થઈ ડૉગ દાંતમાં ભરાય અને ગિયરને લૉક કરે.',[['અંદર','ચેમ્ફરવાળા સ્પ્લાઇન દાંત'],['બહાર','ફોર્ક માટે ખાંચો']]);
+P('ring','sync','બ્લૉકર રિંગ (બૉક રિંગ)','પિત્તળ · 6 નંગ','var(--brass)','અંદરની શંકુ સપાટી ગિયરના કોન પર ઘસાય અને ઘર્ષણથી ઝડપ સરખી કરે. ઝડપ જુદી હોય ત્યાં સુધી તેના ત્રાંસા દાંત સ્લીવને રોકે છે.',[['મટીરિયલ','પિત્તળ / કાંસું'],['તપાસ','કોન પર દબાવી રિંગ અને ગિયર વચ્ચેની ગૅપ માપો'],['ખામી','ઘસાય તો ગિયર બદલતાં ઘરરર']]);
+P('strut','sync','સ્ટ્રટ (શિફ્ટિંગ કી)','દરેક હબમાં 3','var(--slv)','હબના ખાંચામાં બેઠેલી નાની કી. સ્લીવ ખસે ત્યારે તે પહેલા બ્લૉકર રિંગને કોન તરફ ધકેલે છે, જેથી ઘર્ષણ શરૂ થાય.');
+P('strutspr','sync','સ્ટ્રટ સ્પ્રિંગ (વાયર રિંગ)','હબની બંને બાજુ','var(--slv)','સ્ટ્રટને બહાર તરફ દબાવી રાખે છે, જેથી સ્ટ્રટ સ્લીવના અંદરના ખાંચામાં બેસે.');
+P('dog','sync','કોન અને ડૉગ દાંત','દરેક ગિયરની બાજુ','var(--hl)','દરેક ગિયરની બાજુમાં નાનો શંકુ (કોન) અને નાના દાંતની રિંગ. કોન પર બ્લૉકર રિંગ ઘસાય અને ડૉગ દાંતમાં સ્લીવ ભરાય.',[['ખામી','દાંતના છેડા ગોળ થાય તો ગિયર નીકળી જાય']]);
+P('lever','sel','ગિયર લીવર અને નૉબ','કૅબિનમાં','var(--mute)','ડ્રાઇવર તેને H પેટર્નમાં ખસેડે છે. નીચેનો છેડો (ફિંગર) પસંદ કરેલી રેલને ધકેલે છે. નૉબ પર ગિયર પેટર્ન છાપેલી હોય છે.',[['પિવટ','બૉલ અને સૉકેટ']]);
+P('boot','sel','લીવર બૂટ','રબર','var(--mute)','લીવરના પિવટ પર રબરનું ઢાંકણ. ધૂળ, પાણી અને અવાજ અંદર જતા રોકે છે.');
+P('tower','sel','શિફ્ટ ટાવર','કેસિંગની ઉપર','var(--mute)','લીવરનો પિવટ અને ફિંગર જેમાં હોય તે એલ્યુમિનિયમ હાઉસિંગ.');
+P('fork','sel','શિફ્ટ ફોર્ક','3 નંગ','var(--mute)','સ્લીવના ખાંચામાં બેઠેલો U આકારનો ભાગ. રેલ સાથે ખસે અને સ્લીવને ગિયર તરફ ધકેલે છે.',[['ખામી','વાંકો/ઘસાયેલો હોય તો ગિયર પૂરો ન લાગે']]);
+P('pad','sel','ફોર્ક પૅડ','નાયલોન','var(--mute)','ફોર્કના છેડા પરના નાયલોન પૅડ. ફરતી સ્લીવ સાથે ઘર્ષણ ઘટાડે છે; ઘસાય તો બદલાય છે.');
+P('rail','sel','શિફ્ટ રેલ (સિલેક્ટર રોડ)','3 નંગ','var(--mute)','ફોર્કને પકડી રાખતા ચમકતા સળિયા. દરેક રેલમાં 3 ડિટેન્ટ ખાંચા છે (ગિયર, ન્યૂટ્રલ, ગિયર).');
+P('detent','sel','ડિટેન્ટ બૉલ અને સ્પ્રિંગ','દરેક રેલ ઉપર','var(--mute)','સ્પ્રિંગવાળી સ્ટીલની બૉલ રેલના ખાંચામાં બેસે છે. ગિયર પોતાની જગ્યાએ ટકે અને લીવરમાં "ક્લિક" લાગે.',[['ખામી','સ્પ્રિંગ નબળી હોય તો ગિયર નીકળી જાય']]);
+P('interlock','sel','ઇન્ટરલૉક પિન','રેલની વચ્ચે','var(--mute)','એક રેલ ખસે ત્યારે બાજુની રેલને લૉક કરે છે, જેથી બે ગિયર એકસાથે ન લાગે.');
+P('revsw','sel','રિવર્સ લાઇટ સ્વિચ','કેસિંગ પર','var(--mute)','રિવર્સ લાગતાં રેલ તેને દબાવે છે અને પાછળની સફેદ રિવર્સ લાઇટ ચાલુ થાય છે.');
+P('bear','brg','બૉલ બેરિંગ','ઇનપુટ અને મુખ્ય શાફ્ટ','var(--mute)','કેસિંગની દીવાલમાં શાફ્ટને ટેકો આપે છે અને ઘર્ષણ ઘટાડે છે. ગિયર ઓઇલથી લ્યુબ્રિકેટ થાય છે.',[['ખામી','ઘસાય તો ગુંજન (હમ) અવાજ']]);
+P('cbear','brg','રોલર બેરિંગ','કાઉન્ટર શાફ્ટ','var(--mute)','કાઉન્ટર શાફ્ટના બંને છેડે. રોલર વધુ ભાર ઝીલે છે.');
+P('needle','brg','નીડલ (સોય) બેરિંગ','દરેક છૂટા ગિયર નીચે','var(--mute)','પાતળા રોલરવાળું બેરિંગ. ગિયર શાફ્ટ પર તેના પર છૂટો ફરે છે; ઓછી જગ્યામાં વધુ ભાર ઝીલે છે.');
+P('pilot2','brg','પાઇલટ નીડલ બેરિંગ','ઇનપુટ ગિયરની અંદર','var(--mute)','મુખ્ય શાફ્ટનો આગળનો છેડો ઇનપુટ ગિયરની અંદર આ બેરિંગ પર ફરે છે, કારણ કે બંને શાફ્ટ જુદી ઝડપે ફરી શકે.');
+P('circlip','brg','સર્કલિપ (સ્નેપ રિંગ)','હબ અને બેરિંગ પાસે','var(--mute)','સ્પ્રિંગ સ્ટીલની રિંગ. હબ અને બેરિંગને શાફ્ટ પર આગળ-પાછળ ખસતા રોકે છે. સર્કલિપ પ્લાયરથી ખોલાય.');
+P('washer','brg','થ્રસ્ટ વૉશર','ગિયરની બાજુમાં','var(--mute)','ગિયર અને શાફ્ટના ખભા વચ્ચે. ગિયરનો ઍક્સિયલ ઘસારો ઝીલે અને એન્ડ પ્લે નક્કી કરે છે.');
+P('seal','brg','ઓઇલ સીલ','આગળ અને પાછળ','var(--mute)','રબરની લિપ સીલ. ફરતા શાફ્ટ પરથી ગિયર ઓઇલ બહાર ન નીકળે અને ધૂળ અંદર ન જાય.',[['ખામી','લીક થાય તો ક્લચ પર તેલ (આગળ) કે પ્રોપેલર પર તેલ (પાછળ)']]);
+P('case','case','ગિયરબોક્સ કેસિંગ','એલ્યુમિનિયમ','var(--mute)','કાસ્ટ એલ્યુમિનિયમનું બૉક્સ. શાફ્ટ અને બેરિંગને ટેકો આપે છે અને ગિયર ઓઇલ ભરી રાખે છે. અહીં આગળનો અડધો ભાગ કાપેલો (કટઅવે) બતાવ્યો છે.');
+P('bell','case','બેલ હાઉસિંગ','એલ્યુમિનિયમ','var(--mute)','ઘંટ આકારનો આગળનો ભાગ. અંદર ક્લચ છે અને તે એન્જિન બ્લૉક સાથે બોલ્ટ થાય છે. નીચે ધૂળ કવર અને બાજુમાં સ્ટાર્ટર લાગે છે.');
+P('ext','case','એક્સ્ટેન્શન હાઉસિંગ','પાછળ','var(--mute)','મુખ્ય શાફ્ટનો પાછળનો ભાગ, સ્પીડોમીટર ગિયર અને પાછળની ઓઇલ સીલ તેમાં હોય છે. નીચે ગિયરબોક્સ માઉન્ટ લાગે છે.');
+P('bolt','case','કેસિંગ બોલ્ટ','ઝિંક પ્લેટેડ','var(--mute)','બેલ હાઉસિંગને એન્જિન સાથે અને એક્સ્ટેન્શનને કેસિંગ સાથે જકડે છે.');
+P('oil','case','ગિયર ઓઇલ','GL-4 · 75W-90','var(--brass)','કેસિંગના નીચેના ભાગમાં ભરેલું ઓઇલ. કાઉન્ટર શાફ્ટના ગિયર ફરીને તેને બધે ઉછાળે છે (સ્પ્લૅશ લ્યુબ્રિકેશન).',[['લેવલ','ફિલર પ્લગના કાણાની નીચલી ધાર સુધી'],['રંગ','નવું: પીળું-સોનેરી; જૂનું: કાળું']]);
+P('drain','case','ડ્રેઇન પ્લગ (ચુંબક સાથે)','કેસિંગ નીચે','var(--mute)','ઓઇલ કાઢવા માટે નીચેનો પ્લગ. અંદરનું ચુંબક લોખંડની ઝીણી રજ પકડી રાખે છે; કોપર વૉશર બદલવું.');
+P('filler','case','ફિલર પ્લગ','કેસિંગની બાજુ','var(--mute)','ઓઇલ ભરવા અને લેવલ ચેક કરવાનો પ્લગ. ઓઇલ તેના કાણાની નીચલી ધાર સુધી ભરવું.');
+P('breather','case','બ્રીધર (વેન્ટ)','કેસિંગની ઉપર','var(--mute)','ગરમ થતાં અંદરની હવા બહાર જવા દે છે, જેથી દબાણથી સીલમાંથી ઓઇલ લીક ન થાય.');
+P('speedo','case','સ્પીડોમીટર ડ્રાઇવ (વર્મ)','મુખ્ય શાફ્ટ પર','var(--mute)','મુખ્ય શાફ્ટ પરનો વર્મ ગિયર પ્લાસ્ટિક ડ્રિવન ગિયરને ફેરવે છે; તેનાથી સ્પીડોમીટર કેબલ કે સ્પીડ સેન્સર (VSS) ચાલે છે.');
+P('speedopin','case','સ્પીડો ડ્રિવન ગિયર','પ્લાસ્ટિક','var(--mute)','વર્મથી ફરતો નાનો પ્લાસ્ટિક ગિયર. તેના દાંત ટાયર સાઇઝ મુજબ બદલાય છે.');
+P('mount','case','ગિયરબોક્સ માઉન્ટિંગ','રબર + સ્ટીલ','var(--mute)','ગિયરબોક્સને ચેસિસ પર ટેકવે છે. રબર કંપન શોષે છે.',[['ખામી','રબર ફાટે તો ગિયર બદલતાં ઝટકો']]);
+P('flange','case','આઉટપુટ ફ્લેન્જ (યોક)','મુખ્ય શાફ્ટનો છેડો','var(--mute)','મુખ્ય શાફ્ટના છેડે સ્પ્લાઇન અને નટથી લાગેલો ફ્લેન્જ. અહીંથી પાવર પ્રોપેલર શાફ્ટમાં જાય છે.');
+P('uj','case','યુનિવર્સલ જૉઇન્ટ (ક્રૉસ)','પ્રોપેલર શાફ્ટ','var(--mute)','ક્રૉસ અને નીડલ બેરિંગ કૅપવાળો સાંધો. શાફ્ટ ખૂણો બદલે છતાં પાવર લઈ જાય છે.',[['જાળવણી','ગ્રીસ નિપલથી ગ્રીસ']]);
+P('prop','case','પ્રોપેલર શાફ્ટ','વ્હીલ તરફ','var(--mute)','ગિયરબોક્સથી ડિફરન્શિયલ સુધી પાવર લઈ જતી નળી જેવી શાફ્ટ.');
 
 /* ---------------- build model ---------------- */
 const root=new THREE.Group();scene.add(root);root.position.y=-.2;
-const G={};// animated groups
-// engine stub + flywheel
-G.fly=new THREE.Group();G.fly.position.x=-5.25;root.add(G.fly);
-add(G.fly,'fly',cylX(1.32,.2,64),mat('dark'),0,0,0);
-add(G.fly,'fly',gearGeo(116,.023,.16,1.2,0,1.0),mat('steel'),0,0,0);
-add(G.fly,'fly',cylX(.26,.6,24),mat('black'),-.4,0,0);
-for(let i=0;i<6;i++){const a=i/6*TAU;add(G.fly,'fly',cylX(.05,.06,10),mat('black'),-.12,Math.cos(a)*.42,Math.sin(a)*.42);}
-const engBlock=new THREE.Mesh(new THREE.BoxGeometry(.6,2.4,2.2),new THREE.MeshStandardMaterial({color:0x3c444c,metalness:.4,roughness:.6}));engBlock.position.set(-6.05,-.35,0);engBlock.castShadow=true;root.add(engBlock);
-// input group: shaft, clutch disc (slides), drive gear + dog ring + cone
-G.in=new THREE.Group();root.add(G.in);
-add(G.in,'input',cylX(.14,2.05,24),mat('shaft'),-4.0,0,0,['in']);
-add(G.in,'input',gearGeo(20,.016,.5,0,0,1.0),mat('shaft'),-4.75,0,0,['in']);
-G.disc=new THREE.Group();G.in.add(G.disc);
-add(G.disc,'disc',ring(.55,1.13,.06,64),mat('friction'),0,0,0,['in']);
-add(G.disc,'disc',ring(.2,.6,.03,48),mat('spring'),0,0,0,['in']);
-add(G.disc,'disc',cylX(.2,.16,24),mat('steel'),0,0,0,['in']);
-for(let i=0;i<4;i++){const a=i/4*TAU+.4;const m=add(G.disc,'disc',new THREE.CylinderGeometry(.05,.05,.24,12),mat('spring'),.0,Math.cos(a)*.38,Math.sin(a)*.38,['in']);m.rotation.x=a;}
-const inGearG=new THREE.Group();inGearG.position.x=GD['4'].x;G.in.add(inGearG);
-const inGear=add(inGearG,'ingear',gearGeo(18,M,.40,.13,.36),mat('steel'),0,0,0,['in']);
-// pressure plate (engine speed) + release bearing (no spin)
-G.press=new THREE.Group();G.press.position.x=-5.025;root.add(G.press);
-add(G.press,'press',ring(.45,1.2,.12,64),mat('bright'),0,0,0);
-add(G.press,'press',lathe([[1.25,-.1],[1.3,-.1],[1.3,.12],[.5,.2],[.5,.24],[1.25,.16]],64),mat('dark'),.06,0,0);
-for(let i=0;i<12;i++){const a=i/12*TAU;const m=add(G.press,'press',new THREE.BoxGeometry(.03,.32,.08),mat('spring'),.22,Math.cos(a)*.42,Math.sin(a)*.42);m.rotation.x=a+Math.PI/2;}
-G.rel=new THREE.Group();G.rel.position.x=-4.72;root.add(G.rel);
-add(G.rel,'rel',ring(.16,.32,.16,32),mat('bright'),0,0,0);
-add(G.rel,'rel',cylX(.2,.3,24),mat('black'),.2,0,0);
-// counter cluster
-G.cs=new THREE.Group();G.cs.position.y=CY;root.add(G.cs);
+const G={};
+// ---- engine side (static block + rotating flywheel)
+const engG=ex(grp(root),-3.4,0,0);
+add(engG,'block',new THREE.BoxGeometry(.7,3.0,2.7),mat('iron'),-6.2,-.45,0);
+add(engG,'block',cylX(.5,.06,32),mat('rubber'),-5.83,0,0);   // rear main seal face
+G.fly=ex(grp(root,-5.45),-3.15,0,0);
+add(G.fly,'crank',cylX(.4,.12,40),mat('machined'),-.24,0,0);
+add(G.fly,'fly',lathe([[.16,-.12],[1.24,-.12],[1.31,-.07],[1.31,.12],[1.13,.12],[1.12,.105],[.5,.105],[.48,.12],[.16,.12],[.16,-.12]],72),mat('iron'));
+add(G.fly,'fly',faceRing(.52,1.11,1),mat('machined',{side:THREE.DoubleSide}),.121,0,0,[],true);
+add(G.fly,'ringgear',gearGeo(118,.023,.15,1.27,0,1.0),mat('gear'),-.03,0,0);
+inst(G.fly,'flybolt',hexX(.055,.05),mat('zinc'),[...Array(6)].map((_,i)=>{const a=i/6*TAU;return [.14,Math.cos(a)*.3,Math.sin(a)*.3];}));
+inst(G.fly,'dowel',cylX(.028,.1,12),mat('bright'),[0,1,2].map(i=>{const a=i/3*TAU+.5;return [.16,Math.cos(a)*1.21,Math.sin(a)*1.21];}));
+add(G.fly,'pilot',ring(.075,.13,.07,24),mat('bright'),.08,0,0,[],true);
+// ---- starter motor (bolted to bell housing, pinion meets the ring gear)
+const stG=ex(grp(root,0,-1.06,-1.06),-1.6,-.9,-.6);
+add(stG,'starter',cylX(.27,.95,32),mat('paint'),-4.3,0,0);
+add(stG,'starter',cylX(.22,.3,32),mat('alu'),-4.95,0,0);
+add(stG,'starter',cylX(.15,.62,24),mat('zinc'),-4.35,-.24,-.24);
+inst(stG,'starter',cylX(.03,.1,8),mat('copper'),[[-3.98,-.28,-.36],[-3.98,-.36,-.28]]);
+add(stG,'starter',gearGeo(10,.023,.13,.0,0,1),mat('bright'),-5.47,0,0);
+// ---- input shaft + clutch disc (rotate together)
+G.in=ex(grp(root),-1.6,0,0);
+add(G.in,'input',cylX(.14,2.6,24),mat('shaft'),-4.28,0,0,['in']);
+add(G.in,'input',cylX(.075,.1,16),mat('shaft'),-5.62,0,0,['in']);
+add(G.in,'input',gearGeo(20,.016,.5,0,0,1.0),mat('shaft'),-5.15,0,0,['in']);
+G.disc=ex(grp(G.in,-5.27),-.83,0,0);
+function liningPack(parent,x,dir){const t=.03,rIn=.6,rOut=1.1;
+  add(parent,'lining',faceRing(rIn,rOut,dir),mat('lining',{side:THREE.DoubleSide}),x+dir*t/2,0,0,['in'],true);
+  const e=new THREE.CylinderGeometry(rOut,rOut,t,72,1,true);e.rotateZ(-Math.PI/2);add(parent,'lining',e,mat('liningEdge',{side:THREE.DoubleSide}),x,0,0,['in'],true);}
+liningPack(G.disc,-.05,-1);liningPack(G.disc,.05,1);
+add(G.disc,'disc',ring(.55,1.08,.035,72),mat('yzinc'),0,0,0,['in']);                    // cushion plate
+const plateShape=new THREE.Shape();plateShape.absarc(0,0,.57,0,TAU,false);
+{const h=new THREE.Path();h.absarc(0,0,.2,0,TAU,true);plateShape.holes.push(h);
+ for(let i=0;i<6;i++){const a=i/6*TAU,c=Math.cos(a),s2=Math.sin(a),r=.42,L=.12,Wd=.055;const w=new THREE.Path();
+   const pts=[[-L,-Wd],[L,-Wd],[L,Wd],[-L,Wd]].map(([u,v])=>[r*c+u*-s2+v*c,r*s2+u*c+v*s2]);w.moveTo(...pts[3]);w.lineTo(...pts[2]);w.lineTo(...pts[1]);w.lineTo(...pts[0]);w.closePath();plateShape.holes.push(w);}}
+const plateGeo=new THREE.ExtrudeGeometry(plateShape,{depth:.016,bevelEnabled:false,curveSegments:24});plateGeo.translate(0,0,-.008);plateGeo.rotateY(Math.PI/2);
+add(G.disc,'disc',plateGeo,mat('yzinc'),.0,0,0,['in']);add(G.disc,'disc',plateGeo,mat('yzinc'),.11,0,0,['in']);
+for(let i=0;i<6;i++){const a=i/6*TAU;const sp=add(G.disc,'damper',springGeo(.04,.2,5,.011),mat('spring'),.055,Math.cos(a)*.42,Math.sin(a)*.42,['in'],true);sp.rotation.x=a;}
+inst(G.disc,'damper',cylX(.018,.12,10),mat('zinc'),[...Array(6)].map((_,i)=>{const a=(i+.5)/6*TAU;return [.055,Math.cos(a)*.53,Math.sin(a)*.53];}));
+add(G.disc,'dischub',cylX(.21,.26,28),mat('steel'),.09,0,0,['in']);
+add(G.disc,'dischub',cylX(.3,.05,28),mat('steel'),.055,0,0,['in']);
+// ---- pressure plate assembly (bolted to the flywheel, rotates with the engine)
+G.press=ex(grp(root,-5.13),-1.07,0,0);
+G.pplate=ex(grp(G.press),-.9,0,0);
+add(G.pplate,'press',lathe([[.6,-.07],[1.11,-.07],[1.11,.04],[.96,.04],[.94,.085],[.92,.04],[.6,.04],[.6,-.07]],72),mat('iron'));
+add(G.pplate,'press',faceRing(.6,1.11,-1),mat('machined',{side:THREE.DoubleSide}),-.071,0,0,[],true);
+inst(G.pplate,'press',new THREE.BoxGeometry(.08,.14,.14),mat('iron'),[0,1,2].map(i=>{const a=i/3*TAU+.3;return [-.01,Math.cos(a)*1.16,Math.sin(a)*1.16,a,0,0];}));
+inst(G.press,'strap',new THREE.BoxGeometry(.012,.04,.34),mat('zinc'),[0,1,2].map(i=>{const a=i/3*TAU+.3;const aa=a+.14;return [.0,Math.cos(aa)*1.19,Math.sin(aa)*1.19,aa,0,0];}));
+// diaphragm spring: slotted, dished disc with 18 fingers
+{const sh=new THREE.Shape();sh.absarc(0,0,1.0,0,TAU,false);const hole=new THREE.Path();hole.absarc(0,0,.27,0,TAU,true);sh.holes.push(hole);
+ for(let i=0;i<18;i++){const a=(i+.5)/18*TAU,c=Math.cos(a),s2=Math.sin(a);const sl=new THREE.Path();const W=.016;
+   const pts=[[.29,-W],[.72,-W],[.72,W],[.29,W]].map(([r,v])=>[r*c-v*s2,r*s2+v*c]);sl.moveTo(...pts[3]);sl.lineTo(...pts[2]);sl.lineTo(...pts[1]);sl.lineTo(...pts[0]);sl.closePath();sh.holes.push(sl);
+   const ch=new THREE.Path();ch.absarc(.77*c,.77*s2,.032,0,TAU,true);sh.holes.push(ch);}
+ const g=new THREE.ExtrudeGeometry(sh,{depth:.022,bevelEnabled:false,curveSegments:10});g.translate(0,0,-.011);g.rotateY(Math.PI/2);
+ const pa=g.attributes.position;for(let i=0;i<pa.count;i++){const r=Math.hypot(pa.getY(i),pa.getZ(i));pa.setX(i,pa.getX(i)+(1-r)*.2);}g.computeVertexNormals();
+ G.diaph=ex(add(G.press,'diaphragm',g,mat('blued',{side:THREE.DoubleSide}),.1,0,0),-.5,0,0);}
+G.cover=ex(grp(G.press),0,0,0);
+add(G.cover,'cover',lathe([[1.34,-.2],[1.19,-.2],[1.17,.12],[1.12,.16],[.96,.17],[.9,.14]],72),mat('paint',{side:THREE.DoubleSide}));
+inst(G.cover,'cover',hexX(.05,.05),mat('zinc'),[...Array(6)].map((_,i)=>{const a=i/6*TAU+.26;return [-.17,Math.cos(a)*1.26,Math.sin(a)*1.26];}));
+// ---- release bearing, guide sleeve, release fork, cable
+G.rel=ex(grp(root,-4.8),-.8,0,0);
+add(G.rel,'rel',ring(.2,.34,.1,40),mat('bright'),-.05,0,0);
+add(G.rel,'rel',ring(.2,.3,.16,32),mat('plastic'),.08,0,0);
+add(G.rel,'rel',ring(.2,.44,.03,32),mat('plastic'),.15,0,0);
+const guideG=ex(grp(root),-.6,-1.1,0);
+add(guideG,'guide',ring(.155,.185,1.15,28),mat('steel'),-4.27,0,0);
+add(guideG,'guide',ring(.15,.52,.1,40),mat('alu'),-3.66,0,0);
+add(guideG,'seal',ring(.14,.2,.05,28),mat('rubber'),-3.73,0,0,[],true);
+G.rfork=ex(grp(root,-4.6,-.95,0),-.8,-.4,0);
+inst(G.rfork,'relfork',new THREE.BoxGeometry(.05,.75,.06),mat('paint'),[[0,1.02,.3],[0,1.02,-.3]]);
+add(G.rfork,'relfork',new THREE.BoxGeometry(.05,.06,.66),mat('paint'),0,.65,0);
+add(G.rfork,'relfork',new THREE.BoxGeometry(.05,1.55,.12),mat('paint'),0,-.12,0);
+add(G.rfork,'relfork',new THREE.SphereGeometry(.07,16,12),mat('bright'),.06,0,0,[],true);
+add(root,'cable',new THREE.TubeGeometry(new THREE.CatmullRomCurve3([new THREE.Vector3(-4.6,-1.85,0),new THREE.Vector3(-5.0,-2.15,0),new THREE.Vector3(-5.6,-2.25,.1),new THREE.Vector3(-6.0,-2.0,.4)]),24,.03,8,false),mat('rubber'));
+// ---- input drive gear (part of the input shaft)
+const inGearG=grp(G.in,GD['4'].x);
+const inGear=add(inGearG,'ingear',gearGeo(18,M,.40,.13,.36),mat('gear'),0,0,0,['in']);
+// ---- bell housing, main casing, extension housing, shift tower, oil (cut-away together)
+const caseG=grp(root);
+{const bell=lathe([[1.76,-5.33],[1.8,-5.25],[1.66,-4.7],[1.42,-3.9],[1.32,-3.62]],64);
+ const bm=add(caseG,'bell',bell,cmat('alu'),0,0,0,[],true);bm.userData.case=1;
+ const bf=add(caseG,'bell',ring(1.62,1.92,.07,64),cmat('alu'),-5.3,0,0,[],true);bf.userData.case=1;
+ const bb=inst(caseG,'bolt',hexX(.06,.06),cmat('zinc'),[...Array(10)].map((_,i)=>{const a=i/10*TAU+.3;return [-5.23,Math.cos(a)*1.76,Math.sin(a)*1.76];}));bb.userData.case=1;
+ const sh=new THREE.Shape();const w=1.3,top=1.5,bot=-2.72,r=.75;
+ sh.moveTo(-w+r,bot);sh.lineTo(w-r,bot);sh.quadraticCurveTo(w,bot,w,bot+r);sh.lineTo(w,top-r);sh.quadraticCurveTo(w,top,w-r,top);sh.lineTo(-w+r,top);sh.quadraticCurveTo(-w,top,-w,top-r);sh.lineTo(-w,bot+r);sh.quadraticCurveTo(-w,bot,-w+r,bot);
+ const geo=new THREE.ExtrudeGeometry(sh,{depth:7.1,bevelEnabled:false,curveSegments:10});geo.translate(0,0,-3.55);geo.rotateY(Math.PI/2);
+ const cm=add(caseG,'case',geo,cmat('alu'),0,0,0,[],true);cm.userData.case=1;
+ const el=new THREE.LineSegments(new THREE.EdgesGeometry(geo,25),caseEdge);caseG.add(el);
+ // oil sump: lower part of the casing, up to just under the counter shaft
+ const os=new THREE.Shape();const ow=w-.05,ob=bot+.05,ot=-1.95,orr=.7;os.moveTo(-ow+orr,ob);os.lineTo(ow-orr,ob);os.quadraticCurveTo(ow,ob,ow,ob+orr);os.lineTo(ow,ot);os.lineTo(-ow,ot);os.lineTo(-ow,ob+orr);os.quadraticCurveTo(-ow,ob,-ow+orr,ob);
+ const og=new THREE.ExtrudeGeometry(os,{depth:7.0,bevelEnabled:false,curveSegments:10});og.translate(0,0,-3.5);og.rotateY(Math.PI/2);
+ const oil=add(caseG,'oil',og,oilMat,0,0,0,[],true);oil.renderOrder=3;oil.userData.case=1;
+ const ext=add(caseG,'ext',lathe([[.5,3.55],[.76,3.56],[.76,3.66],[.5,3.68],[.44,4.15],[.38,4.42],[.3,4.48]],48),cmat('alu'),0,0,0,[],true);ext.userData.case=1;
+ const eb=inst(caseG,'bolt',hexX(.05,.05),cmat('zinc'),[...Array(6)].map((_,i)=>{const a=i/6*TAU+.5;return [3.7,Math.cos(a)*.66,Math.sin(a)*.66];}));eb.userData.case=1;
+ const tw=add(caseG,'tower',new THREE.BoxGeometry(1.1,.32,.9),cmat('alu'),-.15,1.66,0,[],true);tw.userData.case=1;}
+add(root,'seal',ring(.14,.24,.06,28),mat('rubber'),4.47,0,0,[],true);
+// drain plug with magnet, filler plug, breather, reverse-light switch
+add(root,'drain',new THREE.CylinderGeometry(.09,.09,.07,6),mat('zinc'),.8,-2.79,0);
+add(root,'drain',new THREE.CylinderGeometry(.11,.11,.015,24),mat('copper'),.8,-2.745,0,[],true);
+add(root,'drain',new THREE.CylinderGeometry(.05,.05,.07,16),mat('dark'),.8,-2.66,0,[],true);
+{const f=add(root,'filler',new THREE.CylinderGeometry(.09,.09,.07,6),mat('zinc'),-.6,-1.95,-1.34);f.rotation.x=Math.PI/2;}
+add(root,'breather',new THREE.CylinderGeometry(.035,.035,.12,12),mat('bright'),1.0,1.56,-.35,[],true);
+add(root,'breather',new THREE.CylinderGeometry(.07,.07,.04,16),mat('rubber'),1.0,1.63,-.35,[],true);
+add(root,'revsw',new THREE.CylinderGeometry(.075,.075,.09,6),mat('zinc'),2.95,1.55,.34,[],true);
+add(root,'revsw',new THREE.BoxGeometry(.12,.12,.1),mat('plastic'),2.95,1.66,.34,[],true);
+// gearbox mount under the extension
+const mountG=ex(grp(root),2.2,-.6,0);
+add(mountG,'mount',new THREE.BoxGeometry(.42,.26,.5),mat('rubber'),4.1,-.6,0);
+add(mountG,'mount',new THREE.BoxGeometry(.85,.04,.95),mat('paint'),4.1,-.75,0);
+add(mountG,'mount',new THREE.BoxGeometry(.5,.04,.6),mat('paint'),4.1,-.45,0);
+// ---- counter shaft cluster
+G.cs=ex(grp(root,0,CY),0,-.75,0);
 add(G.cs,'counter',cylX(.15,6.95,24),mat('shaft'),-.03,0,0,['cs']);
 const csGears={};
-for(const id in GD){const g=GD[id];const Zc=g.Zc;const m=add(G.cs,'counter',gearGeo(Zc,M,g.w,.15,-.36),mat('steel'),g.x,0,0,['cs','cg:'+id]);
+for(const id in GD){const g=GD[id];const Zc=g.Zc;const m=add(G.cs,'counter',gearGeo(Zc,M,g.w,.15,-.36),mat('gear'),g.x,0,0,['cs','cg:'+id]);
   const p=TAU/Zc;m.userData.a0=Math.PI/2-p/2;m.rotation.x=m.userData.a0;csGears[id]=m;}
-// main shaft group (rotates with output)
-G.main=new THREE.Group();root.add(G.main);
+// ---- main shaft group (rotates with output)
+G.main=grp(root);
 add(G.main,'main',cylX(.13,7.25,24),mat('shaft'),.75,0,0,['main']);
-add(G.main,'flange',cylX(.2,.5,24),mat('steel'),4.55,0,0,['main']);
-add(G.main,'flange',cylX(.55,.08,48),mat('steel'),4.84,0,0,['main']);
-for(let i=0;i<4;i++){const a=i/4*TAU+.78;add(G.main,'flange',cylX(.05,.12,10),mat('black'),4.9,Math.cos(a)*.42,Math.sin(a)*.42,['main']);}
-add(G.main,'flange',new THREE.BoxGeometry(.32,.12,.86),mat('dark'),5.05,0,0,['main']);
-add(G.main,'flange',cylX(.13,.8,20),mat('dark'),5.6,0,0,['main']);
-// free main gears with dog ring + cone
+// speedometer worm + output flange, UJ, propeller shaft
+const spW=ex(grp(G.main,4.0),2.0,0,0);
+add(spW,'speedo',cylX(.15,.24,24),mat('bright'),0,0,0,['main']);
+{const h=add(spW,'speedo',springGeo(.155,.2,3,.022),mat('bright'),0,0,0,['main'],true);h.rotation.y=Math.PI/2;}
+const outG=ex(grp(G.main),2.6,0,0);
+add(outG,'flange',cylX(.2,.5,24),mat('steel'),4.65,0,0,['main']);
+add(outG,'flange',cylX(.55,.08,48),mat('steel'),4.92,0,0,['main']);
+inst(outG,'flange',cylX(.05,.12,10),mat('zinc'),[0,1,2,3].map(i=>{const a=i/4*TAU+.78;return [4.98,Math.cos(a)*.42,Math.sin(a)*.42];}));
+add(outG,'flange',hexX(.12,.06),mat('zinc'),4.99,0,0,['main']);
+inst(outG,'uj',new THREE.BoxGeometry(.3,.1,.1),mat('steel'),[[5.12,.32,0],[5.12,-.32,0],[5.42,0,.32],[5.42,0,-.32]]);
+add(outG,'uj',new THREE.CylinderGeometry(.05,.05,.72,12),mat('bright'),5.27,0,0);
+{const c2=add(outG,'uj',new THREE.CylinderGeometry(.05,.05,.72,12),mat('bright'),5.27,0,0);c2.rotation.x=Math.PI/2;}
+inst(outG,'uj',new THREE.CylinderGeometry(.075,.075,.08,16),mat('dark'),[[5.27,.36,0],[5.27,-.36,0],[5.27,0,.36,Math.PI/2],[5.27,0,-.36,Math.PI/2]]);
+add(outG,'prop',cylX(.24,1.0,32),mat('paint'),6.1,0,0,['main']);
+// speedo driven gear (rotates on its own axis)
+const spPin=ex(grp(root,4.0,-.335,0),2.0,-.5,0);
+{const pg=gearGeo(14,.022,.08,.03,0,1);pg.rotateY(-Math.PI/2);G.spPin=add(spPin,'speedopin',pg,mat('cream'),0,0,0,[],true);
+ add(spPin,'speedopin',new THREE.CylinderGeometry(.09,.09,.42,16),mat('plastic'),0,-.3,0,[],true);
+ add(spPin,'speedopin',new THREE.TubeGeometry(new THREE.CatmullRomCurve3([new THREE.Vector3(0,-.5,0),new THREE.Vector3(.1,-.85,0),new THREE.Vector3(.5,-1.0,0)]),16,.03,8,false),mat('rubber'),0,0,0,[],true);}
+// free main gears with dog ring + cone + needle bearing + thrust washer
 const mGear={},mG={};
-for(const id of ['1','2','3','5','R']){const g=GD[id];const grp=new THREE.Group();grp.position.x=g.x;root.add(grp);mG[id]=grp;
-  const m=add(grp,'g'+id,gearGeo(g.Zm,M,g.w,.15,.36),mat('steel'),0,0,0,['mg:'+id]);m.userData.a0=Math.PI*1.5;m.rotation.x=m.userData.a0;mGear[id]=m;}
+for(const id of ['1','2','3','5','R']){const g=GD[id];const gr=ex(grp(root,g.x),g.x*.55+g.side*.3,0,0);mG[id]=gr;
+  const m=add(gr,'g'+id,gearGeo(g.Zm,M,g.w,.15,.36),mat('gear'),0,0,0,['mg:'+id]);m.userData.a0=Math.PI*1.5;m.rotation.x=m.userData.a0;mGear[id]=m;
+  const nd=ex(grp(G.main,g.x),g.x*.55+g.side*.12,0,0);
+  inst(nd,'needle',cylX(.012,g.w*.85,6),mat('bright'),[...Array(16)].map((_,i)=>{const a=i/16*TAU;return [0,Math.cos(a)*.142,Math.sin(a)*.142];}));
+  const wx=g.x-g.side*(g.w/2+.012);const wa=ex(grp(G.main,wx),wx*.55-g.side*.5,0,0);add(wa,'washer',ring(.14,.3,.02,32),mat('zinc'),0,0,0,[],true);}
 mG['4']=inGearG;mGear['4']=inGear;
-// dog ring + cone for every gear (on the hub side)
-for(const id in GD){const g=GD[id];const hx=HUBS[g.hub].x,sd=g.side;const grp=mG[id];
-  const dogX=hx+sd*.47-g.x,coneX=hx+sd*.38-g.x;
-  add(grp,'dog',gearGeo(28,.024,.10,.15,0,1.0),mat('bright'),dogX,0,0,[id==='4'?'in':'mg:'+id,'dog:'+id]);
-  const cone=add(grp,'dog',lathe([[.17,-.04],[.26,-.04],[.31,.04],[.17,.04]],32),mat('bright'),coneX,0,0,[id==='4'?'in':'mg:'+id,'dog:'+id]);
-  cone.scale.x=-sd;cone.material.side=THREE.DoubleSide;
-  // web between gear and dog
-  add(grp,'dog',cylX(.3,Math.abs(dogX)-.05,32),mat('steel'),dogX/2,0,0,[id==='4'?'in':'mg:'+id]);
-}
-// idler
-G.idler=new THREE.Group();G.idler.position.set(GD.R.x,IDP.y,IDP.z);root.add(G.idler);
-add(G.idler,'idler',gearGeo(GD.R.Zi,M,.34,.1,0),mat('steel'),0,0,0,['idler']);
-add(root,'idler',cylX(.1,.7,16),mat('dark'),GD.R.x+.05,IDP.y,IDP.z);
-// hubs, sleeves, rings
-const hubM={},slvG={},ringM={};
-for(const hb in HUBS){const H=HUBS[hb];
-  hubM[hb]=add(G.main,'hub',gearGeo(28,.024,.40,.13,0,1.0),mat('steel'),H.x,0,0,['hub:'+hb]);
-  const sg=new THREE.Group();sg.position.x=H.x;G.main.add(sg);slvG[hb]=sg;
-  add(sg,'sleeve',lathe([[.37,-.21],[.5,-.21],[.52,-.19],[.52,-.07],[.45,-.06],[.45,.06],[.52,.07],[.52,.19],[.5,.21],[.37,.21],[.37,-.21]],64),mat('sleeve'),0,0,0,['slv:'+hb]);
-  for(const sd of [-1,1]){const r=new THREE.Group();r.position.x=H.x+sd*.295;G.main.add(r);
+{const pn=grp(G.in,-2.93);inst(pn,'pilot2',cylX(.012,.12,6),mat('bright'),[...Array(14)].map((_,i)=>{const a=i/14*TAU;return [0,Math.cos(a)*.142,Math.sin(a)*.142];}));}
+for(const id in GD){const g=GD[id];const hx=HUBS[g.hub].x,sd=g.side;const gp=mG[id];
+  const dogX=hx+sd*.47-g.x,coneX=hx+sd*.38-g.x;const tg=[id==='4'?'in':'mg:'+id,'dog:'+id];
+  add(gp,'dog',gearGeo(28,.024,.10,.15,0,1.0),mat('gear'),dogX,0,0,tg);
+  const cone=add(gp,'dog',lathe([[.17,-.04],[.26,-.04],[.31,.04],[.17,.04]],32),mat('machined',{side:THREE.DoubleSide}),coneX,0,0,tg);cone.scale.x=-sd;
+  add(gp,'dog',cylX(.3,Math.abs(dogX)-.05,32),mat('gear'),dogX/2,0,0,[tg[0]]);}
+// idler gear and its shaft
+G.idlerP=ex(grp(root,GD.R.x,IDP.y,IDP.z),0,-.3,1.0);
+G.idler=grp(G.idlerP);
+add(G.idler,'idler',gearGeo(GD.R.Zi,M,.34,.1,0),mat('gear'),0,0,0,['idler']);
+add(G.idlerP,'idlershaft',cylX(.1,.72,16),mat('dark'),.05,0,0);
+// synchro hubs, sleeves, blocker rings, struts, strut springs, circlips
+const hubM={},slvG={},ringM={},strutG={};
+for(const hb in HUBS){const H=HUBS[hb];const hxo=H.x*.55;
+  const hg=ex(grp(G.main,H.x),hxo,0,0);
+  hubM[hb]=add(hg,'hub',gearGeo(28,.024,.40,.13,0,1.0),mat('gear'),0,0,0,['hub:'+hb]);
+  add(hg,'strutspr',new THREE.TorusGeometry(.3,.009,6,48).rotateY(Math.PI/2),mat('spring'),-.13,0,0,[],true);
+  add(hg,'strutspr',new THREE.TorusGeometry(.3,.009,6,48).rotateY(Math.PI/2),mat('spring'),.13,0,0,[],true);
+  const cl=ex(grp(G.main,H.x),hxo,0,0);
+  for(const sd of [-1,1])add(cl,'circlip',new THREE.TorusGeometry(.145,.013,6,32).rotateY(Math.PI/2),mat('blued'),sd*.215,0,0,[],true);
+  const stg=ex(grp(G.main,H.x),hxo,.35,0);strutG[hb]=stg;
+  inst(stg,'strut',new THREE.BoxGeometry(.18,.05,.07),mat('steel'),[0,1,2].map(i=>{const a=i/3*TAU+.4;return [0,Math.cos(a)*.35,Math.sin(a)*.35,a,0,0];}));
+  const sg=ex(grp(G.main,H.x),hxo,.85,0);slvG[hb]=sg;
+  add(sg,'sleeve',lathe([[.37,-.21],[.5,-.21],[.52,-.19],[.52,-.07],[.45,-.06],[.45,.06],[.52,.07],[.52,.19],[.5,.21],[.37,.21],[.37,-.21]],64),mat('steel'),0,0,0,['slv:'+hb]);
+  for(const sd of [-1,1]){const r=ex(grp(G.main,H.x+sd*.295),hxo+sd*.32,0,0);
     const gid=Object.keys(GD).find(k=>GD[k].hub===hb&&GD[k].side===sd);
     add(r,'ring',gearGeo(28,.024,.07,.27,0,1.6),mat('brass'),0,0,0,['ring:'+gid]);
-    add(r,'ring',lathe([[.25,-.035],[.3,-.035],[.31,.035],[.27,.035]],32),mat('brass'),0,0,0,['ring:'+gid]);
-    ringM[gid]={grp:r,hb,sd,base:H.x+sd*.295};}
+    add(r,'ring',lathe([[.25,-.035],[.3,-.035],[.31,.035],[.27,.035]],32),mat('brass',{side:THREE.DoubleSide}),0,0,0,['ring:'+gid],true);
+    // three lugs where the struts push
+    inst(r,'ring',new THREE.BoxGeometry(.05,.05,.07),mat('brass'),[0,1,2].map(i=>{const a=i/3*TAU+.4;return [-sd*.05,Math.cos(a)*.32,Math.sin(a)*.32,a,0,0];}),['ring:'+gid]);
+    ringM[gid]={grp:r,hb,sd};}
 }
-// rails + forks
+// shift rails (with detent notches), forks with nylon pads
 const forkG={};
-for(const hb in HUBS){const H=HUBS[hb];const g=new THREE.Group();g.position.x=H.x;root.add(g);forkG[hb]=g;
-  add(g,'rail',cylX(.055,6.6,16),mat('bright'),-.2,RAIL_Y,H.rz);
-  const arc=new THREE.TorusGeometry(.49,.035,10,40,Math.PI);arc.rotateY(Math.PI/2);
-  add(g,'fork',arc,mat('fork'),0,0,0);
-  for(const sz of [-1,1])add(g,'fork',new THREE.BoxGeometry(.09,.12,.06),mat('brass'),0,.02,sz*.49);
+for(const hb in HUBS){const H=HUBS[hb];const g=ex(grp(root,H.x),H.x*.55,1.1,0);forkG[hb]=g;
+  add(g,'rail',cylX(.055,6.85,16),mat('bright'),-H.x,RAIL_Y,H.rz);
+  inst(g,'rail',new THREE.TorusGeometry(.058,.012,6,16).rotateY(Math.PI/2),mat('dark'),[-LOCK,0,LOCK].map(o=>[-3.0-H.x+o,RAIL_Y,H.rz]));
+  const arc=new THREE.TorusGeometry(.49,.04,10,40,Math.PI);arc.rotateY(Math.PI/2);
+  add(g,'fork',arc,mat('fork'));
+  inst(g,'pad',new THREE.BoxGeometry(.1,.12,.06),mat('nylon'),[[0,.03,.49],[0,.03,-.49]]);
   const a=new THREE.Vector3(0,.5,0),b=new THREE.Vector3(0,RAIL_Y,H.rz);const len=a.distanceTo(b);
   const arm=add(g,'fork',new THREE.BoxGeometry(.07,len,.09),mat('fork'),0,(a.y+b.y)/2,(a.z+b.z)/2);arm.rotation.x=Math.atan2(b.z-a.z,b.y-a.y);
-  add(g,'fork',new THREE.BoxGeometry(.24,.14,.16),mat('fork'),0,RAIL_Y,H.rz);
+  add(g,'fork',new THREE.BoxGeometry(.24,.15,.17),mat('fork'),0,RAIL_Y,H.rz);
 }
-// bearings (static outer race + balls)
-function bearing(x,y,rIn,rOut){const g=new THREE.Group();g.position.set(x,y,0);root.add(g);
-  add(g,'bear',ring(rOut-.05,rOut,.16,40),mat('bright'),0,0,0);add(g,'bear',ring(rIn,rIn+.04,.16,32),mat('bright'),0,0,0);
-  const balls=new THREE.Group();g.add(balls);const rb=(rOut-rIn-.09)/2+.005,rm=(rIn+.04+rOut-.05)/2;
-  for(let i=0;i<10;i++){const a=i/10*TAU;add(balls,'bear',new THREE.SphereGeometry(rb,12,8),mat('bright'),0,Math.cos(a)*rm,Math.sin(a)*rm);}
-  return balls;}
-const balls=[bearing(-3.55,0,.14,.34),bearing(3.55,0,.13,.33),bearing(-3.55,CY,.15,.33),bearing(3.55,CY,.15,.33)];
-// casing
-const caseG=new THREE.Group();root.add(caseG);
-(function(){const sh=new THREE.Shape();const w=1.3,top=1.5,bot=-2.72,r=.75;
-  sh.moveTo(-w+r,bot);sh.lineTo(w-r,bot);sh.quadraticCurveTo(w,bot,w,bot+r);sh.lineTo(w,top-r);sh.quadraticCurveTo(w,top,w-r,top);sh.lineTo(-w+r,top);sh.quadraticCurveTo(-w,top,-w,top-r);sh.lineTo(-w,bot+r);sh.quadraticCurveTo(-w,bot,-w+r,bot);
-  const geo=new THREE.ExtrudeGeometry(sh,{depth:7.1,bevelEnabled:false,curveSegments:10});geo.translate(0,0,-3.55);geo.rotateY(Math.PI/2);
-  const m=new THREE.Mesh(geo,caseMat);m.renderOrder=5;m.userData.part='case';PARTS.case.meshes.push(m);caseG.add(m);
-  caseG.add(new THREE.LineSegments(new THREE.EdgesGeometry(geo,25),caseEdge));
-  const bell=lathe([[1.7,-.8],[1.75,-.75],[1.3,.75],[1.25,.8]],48);const bm=new THREE.Mesh(bell,caseMat);bm.position.x=-4.35;bm.renderOrder=5;bm.userData.part='case';PARTS.case.meshes.push(bm);caseG.add(bm);
-  const be=new THREE.LineSegments(new THREE.EdgesGeometry(bell,30),caseEdge);be.position.x=-4.35;caseG.add(be);
-})();
-// remember base materials for teaching colours / emissive
-const allMeshes=[];root.traverse(o=>{if(o.isMesh&&o.userData.part&&o.userData.part!=='case')allMeshes.push(o);});
+// detent balls + springs + plugs above each rail, interlock pins between rails
+const detG=ex(grp(root),0,1.25,0);
+for(const hb in HUBS){const H=HUBS[hb];
+  add(detG,'detent',new THREE.SphereGeometry(.042,14,10),mat('bright'),-3.0,RAIL_Y+.1,H.rz,[],true);
+  const sp=add(detG,'detent',springGeo(.03,.2,6,.007),mat('spring'),-3.0,RAIL_Y+.25,H.rz,[],true);sp.rotation.x=-Math.PI/2;
+  add(detG,'detent',new THREE.CylinderGeometry(.065,.065,.07,6),mat('zinc'),-3.0,1.55,H.rz,[],true);}
+inst(detG,'interlock',new THREE.CylinderGeometry(.028,.028,.2,10),mat('bright'),[[-3.0,RAIL_Y,-.17,Math.PI/2],[-3.0,RAIL_Y,.17,Math.PI/2]]);
+// gear lever: ball pivot, chrome rod, black knob with shift pattern, rubber boot
+const levG=ex(grp(root),0,1.5,0);
+G.lever=grp(levG,-.15,1.86,0);
+add(G.lever,'lever',new THREE.SphereGeometry(.1,20,14),mat('zinc'),0,0,0,[],true);
+add(G.lever,'lever',new THREE.CylinderGeometry(.034,.04,1.3,16),mat('chrome'),0,.65,0,[],true);
+add(G.lever,'lever',new THREE.CylinderGeometry(.03,.03,.42,12),mat('steel'),0,-.21,0,[],true);
+add(G.lever,'lever',new THREE.BoxGeometry(.08,.1,.08),mat('steel'),0,-.44,0,[],true);
+{const kn=new THREE.SphereGeometry(.17,28,20);const k=add(G.lever,'lever',kn,mat('leather'),0,1.42,0);k.scale.set(1,1.12,1);
+ add(G.lever,'lever',new THREE.CylinderGeometry(.06,.07,.08,20),mat('chrome'),0,1.24,0,[],true);
+ const top=new THREE.CircleGeometry(.12,32);top.rotateX(-Math.PI/2);add(G.lever,'lever',top,new THREE.MeshStandardMaterial({map:TEX.knob,roughness:.5,metalness:.1}),0,1.605,0,[],true);}
+{const pts=[];for(let i=0;i<=12;i++){const t=i/12;pts.push(new THREE.Vector2(.36-.27*t+(i%2?.035:0),1.82+t*.5));}
+ add(levG,'boot',new THREE.LatheGeometry(pts,32),mat('rubber',{side:THREE.DoubleSide}),-.15,0,0,[],true);}
+// bearings: ball type (input, main) and roller type (counter shaft); inner race + balls turn with the shaft
+function bearing(x,y,rIn,rOut,part,roller,eo){const g=ex(grp(root,x,y),...eo);
+  add(g,part,ring(rOut-.05,rOut,.16,40),mat('bright'),0,0,0,[],true);
+  const inner=grp(g);add(inner,part,ring(rIn,rIn+.04,.16,32),mat('bright'),0,0,0,[],true);
+  const rb=(rOut-rIn-.09)/2+.004,rm=(rIn+.04+rOut-.05)/2;const n=roller?14:10;
+  inst(inner,part,roller?cylX(rb,.12,10):new THREE.SphereGeometry(rb,12,8),mat('bright'),[...Array(n)].map((_,i)=>{const a=i/n*TAU;return [0,Math.cos(a)*rm,Math.sin(a)*rm];}));
+  add(inner,part,ring(rm-.012,rm+.012,.05,32),mat(roller?'brass':'plastic'),0,0,0,[],true);   // cage
+  return inner;}
+const balls=[bearing(-3.55,0,.14,.34,'bear',false,[-1.45,0,0]),bearing(3.55,0,.13,.33,'bear',false,[1.9,0,0]),bearing(-3.55,CY,.15,.33,'cbear',true,[-1.6,-.75,0]),bearing(3.55,CY,.15,.33,'cbear',true,[1.8,-.75,0])];
+{const c1=ex(grp(root,-3.66),-1.55,0,0);add(c1,'circlip',new THREE.TorusGeometry(.355,.014,6,40).rotateY(Math.PI/2),mat('blued'),0,0,0,[],true);
+ const c2=ex(grp(root,3.66),1.9,0,0);add(c2,'circlip',new THREE.TorusGeometry(.345,.014,6,40).rotateY(Math.PI/2),mat('blued'),0,0,0,[],true);}
+// everything except casing/oil takes emissive highlights and teaching colours
+const allMeshes=[];root.traverse(o=>{if(o.isMesh&&o.userData.part&&o.userData.part!=='oil')allMeshes.push(o);});
+
+/* ---------------- casing modes ---------------- */
+let CASE_MODE=0; // 0 cut-away, 1 see-through, 2 hidden
+const CASE_TXT=['✂️ કટઅવે','🧊 પારદર્શક','🚫 કેસિંગ બંધ'];
+function applyCase(){for(const m of CASEMATS){m.clippingPlanes=CASE_MODE===0?CLIP:null;m.transparent=CASE_MODE===1;m.opacity=CASE_MODE===1?.15:1;m.depthWrite=CASE_MODE!==1;m.needsUpdate=true;}
+  oilMat.clippingPlanes=CASE_MODE===0?CLIP:null;oilMat.needsUpdate=true;caseEdge.clippingPlanes=CASE_MODE===0?CLIP:null;caseEdge.needsUpdate=true;}
+applyCase();
 
 /* ---------------- teaching colours ---------------- */
 let TEACH=false;
-function teachApply(){readCss();for(const m of allMeshes){const b=m.material.userData.base;if(!b)continue;const t=m.userData.tags||[];let col=null;
+function teachApply(){readCss();for(const m of allMeshes){const b=m.material.userData.base;if(!b||m.userData.case)continue;const t=m.userData.tags||[];let col=null;
     if(TEACH){const tg=t.find(x=>x.startsWith('mg:')||x.startsWith('cg:'));if(tg)col=CSSC['g'+tg.split(':')[1]];
       else if(m.userData.part==='ingear'||(m.userData.part==='dog'&&t.includes('dog:4')))col=CSSC.g4;
       else if(m.userData.part==='idler')col=CSSC.gR;
@@ -718,8 +948,8 @@ applySceneTheme();
 
 /* ---------------- camera views ---------------- */
 const VIEWS={
-  home:{p:[2.4,3.3,11.2],t:[-.5,-.75,0]},
-  clutch:{p:[-2.6,1.4,4.4],t:[-4.85,-.15,0]},
+  home:{p:[2.4,3.3,11.2],t:[-.3,-.75,0]},
+  clutch:{p:[-2.7,1.3,4.4],t:[-5.15,-.15,0]},
   counter:{p:[1.4,-.6,5.6],t:[-.4,-1.55,0]},
   h12:{p:[.85,.9,2.75],t:[-.15,-.05,0]},
   h34:{p:[-1.35,.9,2.75],t:[-2.35,-.05,0]},
@@ -727,10 +957,12 @@ const VIEWS={
   idler:{p:[4.9,-.3,3.6],t:[3.0,-.9,.4]},
   forks:{p:[1.3,3.9,4.6],t:[-.2,.75,0]},
   out:{p:[6.4,1.3,3.6],t:[4.2,-.1,0]},
+  exp:{p:[-.8,3.9,16.8],t:[-.9,-.7,0]},
+  lever:{p:[1.6,3.4,3.4],t:[-.15,2.2,0]},
 };
 let camAnim=null;
-// zoom so the whole gearbox fits the bay at any aspect (wide desktop ≈ 1.2, tall phone ≈ 2.1)
-function fitFactor(){return Math.max(1.05,1.17*Math.pow(1.74/Math.max(.35,camera.aspect),.69));}
+// zoom so the whole gearbox fits the bay at any aspect (wide desktop ≈ 1.2, tall phone ≈ 2.8)
+function fitFactor(){return Math.max(1.1,1.2*Math.pow(1.74/Math.max(.35,camera.aspect),1.0));}
 function camTo(v,instant){const V=typeof v==='string'?VIEWS[v]:v;const t=new THREE.Vector3(...V.t);const p=new THREE.Vector3(...V.p);
   const ff=fitFactor();const off=p.clone().sub(t).multiplyScalar(v==='home'?ff:Math.max(1,Math.pow(ff,.6)));const pp=t.clone().add(off);pp.y+=root.position.y;t.y+=root.position.y;
   if(instant||reduceMotion){camera.position.copy(pp);controls.target.copy(t);camAnim=null;return;}
@@ -771,7 +1003,8 @@ fsLabel();
 /* ---------------- picking ---------------- */
 const ray=new THREE.Raycaster(),ndc=new THREE.Vector2();
 function hit(e){const r=renderer.domElement.getBoundingClientRect();ndc.set((e.clientX-r.left)/r.width*2-1,-(e.clientY-r.top)/r.height*2+1);ray.setFromCamera(ndc,camera);
-  const h=ray.intersectObjects(pickables,false);return h.length?h[0].object.userData.part:null;}
+  const h=ray.intersectObjects(pickables,false);
+  for(const x of h){const o=x.object;if(o.userData.case){if(CASE_MODE!==0||!caseG.visible||x.point.z>.01)continue;}return o.userData.part;}return null;}
 let downAt=null;
 renderer.domElement.addEventListener('pointerdown',e=>{downAt={x:e.clientX,y:e.clientY};controls.autoRotate=false;$('cSpin').setAttribute('aria-pressed','false');});
 renderer.domElement.addEventListener('pointerup',e=>{if(!downAt)return;const moved=Math.hypot(e.clientX-downAt.x,e.clientY-downAt.y);downAt=null;if(moved>6)return;
@@ -783,9 +1016,9 @@ renderer.domElement.addEventListener('pointerleave',()=>{$('tip').hidden=true;})
 
 /* ---------------- inspector ---------------- */
 let SEL='ring',selUntil=0;
-function selectPart(id,focus){SEL=id;selUntil=performance.now()+3500;renderInsp();if(focus)focusPart(id);}
+function selectPart(id,focus){SEL=id;selUntil=performance.now()+3500;renderInsp();if(focus){if(PARTS[id].grp==='case'&&CASE_MODE===2){CASE_MODE=0;applyCase();$('cCase').textContent=CASE_TXT[0];}focusPart(id);}}
 function renderInsp(){const p=PARTS[SEL];
-  $('insp').innerHTML='<div class="ctitle">🧩 ભાગો <small>3D માં કે નીચે નામ પર ટેપ કરો</small></div><span class="eyebrow" style="--c:'+p.c+'">'+p.sub+'</span><h2 style="--c:'+p.c+'">'+p.n+'</h2><p>'+p.d+'</p><div class="prow2">'+p.rows.map(r=>'<b>'+r[0]+'</b><span>'+r[1]+'</span>').join('')+'</div><div class="plist">'+Object.values(PARTS).map(q=>'<button type="button" data-id="'+q.id+'" aria-pressed="'+(q.id===SEL)+'">'+q.n+'</button>').join('')+'</div>';}
+  $('insp').innerHTML='<div class="ctitle">🧩 ભાગો <small>3D માં કે નીચે નામ પર ટેપ કરો</small></div><span class="eyebrow" style="--c:'+p.c+'">'+p.sub+'</span><h2 style="--c:'+p.c+'">'+p.n+'</h2><p>'+p.d+'</p><div class="prow2">'+p.rows.map(r=>'<b>'+r[0]+'</b><span>'+r[1]+'</span>').join('')+'</div>'+PGROUPS.map(([g,gt])=>'<div class="ctitle" style="margin:12px 0 0;font-size:15px">'+gt+'</div><div class="plist" style="margin-top:4px">'+Object.values(PARTS).filter(q=>q.grp===g).map(q=>'<button type="button" data-id="'+q.id+'" aria-pressed="'+(q.id===SEL)+'">'+q.n+'</button>').join('')+'</div>').join('');}
 $('insp').addEventListener('click',e=>{const b=e.target.closest('button[data-id]');if(!b)return;ac();SND.click();selectPart(b.dataset.id,true);});
 renderInsp();
 
@@ -797,7 +1030,7 @@ for(const id in GD){const g=GD[id];const low=id==='3'||id==='5';LABS.push({el:mk
 [['ક્લચ',[-5.0,1.55,0]],['ઇનપુટ શાફ્ટ',[-4.1,.42,0]],['કાઉન્ટર શાફ્ટ',[1.08,CY-.42,0]],['મુખ્ય શાફ્ટ → વ્હીલ',[4.7,.75,0]],['આઇડલર',[GD.R.x,IDP.y-.55,IDP.z+.2]],['1–2',[HUBS.h12.x,RAIL_Y+.28,0]],['3–4',[HUBS.h34.x,RAIL_Y+.28,HUBS.h34.rz]],['5–R',[HUBS.h5R.x,RAIL_Y+.28,HUBS.h5R.rz]]]
   .forEach(([t,p],i)=>{const el=mk('nm');el.textContent=t;LABS.push({el,pos:new THREE.Vector3(...p),rail:i>=5?['h12','h34','h5R'][i-5]:null});});
 let LAB_ON=true;const vtmp=new THREE.Vector3();
-function updateLabels(){minis.hidden=!LAB_ON;if(!LAB_ON)return;const w=view.clientWidth,h=view.clientHeight;
+function updateLabels(){minis.hidden=!LAB_ON||EXP>.05;if(minis.hidden)return;const w=view.clientWidth,h=view.clientHeight;
   const narrow=w<520;
   for(const L of LABS){if(narrow&&!L.id){L.el.style.display='none';continue;}vtmp.copy(L.pos);if(L.rail)vtmp.x+=s.sleeve[L.rail];vtmp.y+=root.position.y;vtmp.project(camera);
     if(vtmp.z>1){L.el.style.display='none';continue;}L.el.style.display='';L.el.style.left=((vtmp.x+1)/2*w).toFixed(1)+'px';L.el.style.top=((1-vtmp.y)/2*h).toFixed(1)+'px';
@@ -807,7 +1040,7 @@ function updateLabels(){minis.hidden=!LAB_ON;if(!LAB_ON)return;const w=view.clie
 /* ---------------- animate model ---------------- */
 const VIS=.02;
 const ORANGE=new THREE.Color(0xff7a1a),PINK=new THREE.Color(0xd4147f),HOTC=new THREE.Color(0xff4d00);
-let FLOW=true;
+let FLOW=false;
 function pathTags(){if(!s.gear||coup(s.p)<.3||!s.running)return null;const g=s.gear,hb=GD[g].hub;
   if(g==='4')return new Set(['in','dog:4','hub:'+hb,'slv:'+hb,'main']);
   const t=new Set(['in','cg:4','cs','cg:'+g,'mg:'+g,'dog:'+g,'hub:'+hb,'slv:'+hb,'main']);if(g==='R')t.add('idler');return t;}
@@ -819,19 +1052,25 @@ function animateModel(dt,now){
   const dc=-s.aI*18/32;G.cs.rotation.x=dc;
   for(const id of ['1','2','3','5']){const g=GD[id];mG[id].rotation.x=-dc*g.Zc/g.Zm;}
   const di=-dc*GD.R.Zc/GD.R.Zi;G.idler.rotation.x=di;mG.R.rotation.x=-di*GD.R.Zi/GD.R.Zm;
-  G.main.rotation.x=s.aO;
-  balls.forEach((b,i)=>b.rotation.x=(i===0?s.aI:i===1?s.aO:dc)*.4);
-  // clutch travel
-  G.disc.position.x=-5.115+s.p*.05;G.press.position.x=-5.025+s.p*.12;G.rel.position.x=-4.72-s.p*.06;
-  for(const hb in HUBS){slvG[hb].position.x=HUBS[hb].x+s.sleeve[hb];forkG[hb].position.x=HUBS[hb].x+s.sleeve[hb];}
-  for(const gid in ringM){const R=ringM[gid];R.grp.position.x=R.base+R.sd*ringPush(gid)*.03;}
+  G.main.rotation.x=s.aO;G.spPin.rotation.z=s.aO*.35;
+  balls[0].rotation.x=s.aI;balls[1].rotation.x=s.aO;balls[2].rotation.x=balls[3].rotation.x=dc;
+  // clutch: release bearing pushes the diaphragm fingers, pressure plate backs off, disc floats free
+  G.disc.userData.d.x=s.p*.03;G.pplate.userData.d.x=s.p*.07;G.rel.userData.d.x=-s.p*.12;G.rfork.rotation.z=s.p*.09;
+  for(const hb in HUBS){slvG[hb].userData.d.x=s.sleeve[hb];forkG[hb].userData.d.x=s.sleeve[hb];strutG[hb].userData.d.x=clamp(s.sleeve[hb],-CONTACT,CONTACT);}
+  for(const gid in ringM){const R=ringM[gid];R.grp.userData.d.x=R.sd*ringPush(gid)*.03;}
+  // gear lever follows the gate knob
+  const kx=(s.knob.x-110)/60,ky=(s.knob.y-100)/60;G.lever.rotation.z=-ky*.24;G.lever.rotation.x=-kx*.22;
+  // exploded view
+  EXP+=(EXP_T-EXP)*Math.min(1,dt/(s.slow?.2:1)*3.2);if(Math.abs(EXP_T-EXP)<.001)EXP=EXP_T;
+  for(const o of EXO){const u=o.userData;o.position.set(u.b.x+u.o.x*EXP+u.d.x,u.b.y+u.o.y*EXP+u.d.y,u.b.z+u.o.z*EXP+u.d.z);}
+  caseG.visible=CASE_MODE!==2&&EXP<.15;floor.position.y=FLOOR_Y-EXP*.9;grid.position.y=floor.position.y+.002;
   // emissive: power flow, sync heat, selection
   const tags=FLOW?pathTags():null;const pulse=.5+.5*Math.sin(now/180);const c=coup(s.p);
   const syncId=(s.phase==='sync'||s.phase==='grind')?s.shiftFor:null;const heat=syncId?clamp(Math.abs(outRpm()*GD[syncId].r-s.I)/1500,.25,1):0;
   const hlOn=SEL&&(performance.now()<selUntil||GAME.flash);
-  for(const m of allMeshes){const e=m.material.emissive;e.setRGB(0,0,0);let k=0;
+  for(const m of allMeshes){const e=m.material.emissive;if(!e)continue;e.setRGB(0,0,0);let k=0;
     if(tags&&m.userData.tags.some(t=>tags.has(t))){e.copy(ORANGE);k=.22+.18*c;}
-    if(syncId&&m.userData.tags.includes('ring:'+syncId)){e.copy(HOTC);k=heat*(s.phase==='grind'?1.2:.9)*(.7+.3*pulse);}
+    if(syncId&&m.userData.tags.includes('ring:'+syncId)){e.copy(HOTC);k=heat*(s.phase==='grind'?1.1:.7)*(.7+.3*pulse);}
     if(hlOn&&m.userData.part===(GAME.flash||SEL)){e.copy(PINK);k=.35+.45*pulse;}
     m.material.emissiveIntensity=k;}
 }
@@ -895,7 +1134,7 @@ const SPOTS={'1':[50,40],'2':[50,160],'3':[110,40],'4':[110,160],'5':[170,40],'R
 for(const [id,[x,y]] of Object.entries(SPOTS)){const g=document.createElementNS('http://www.w3.org/2000/svg','g');g.setAttribute('class','gs');g.setAttribute('tabindex','0');g.setAttribute('role','button');g.dataset.id=id;
   g.setAttribute('aria-label',id==='N'?'ન્યૂટ્રલ':NAME(id));const tx=id==='N'?x+34:x,ty=id==='N'?y:y<100?y-24:y+24;
   g.innerHTML='<circle class="hit" cx="'+x+'" cy="'+y+'" r="26"/><circle cx="'+tx+'" cy="'+ty+'" r="15"/><text x="'+tx+'" y="'+ty+'">'+id+'</text>';
-  g.addEventListener('click',()=>{ac();userGear(id);});g.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();userGear(id);}});$('spots').appendChild(g);}
+  g.addEventListener('pointerdown',e=>{e.preventDefault();ac();userGear(id);});g.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();userGear(id);}});$('spots').appendChild(g);}
 function userGear(id){demoStop();if(s.hold){s.hold=null;}if(s.sel!==id)SND.swish();s.sel=id;}
 function holdBtn(el,key){const on=e=>{e.preventDefault();ac();demoStop();s[key]=true;el.classList.add('down');try{el.setPointerCapture(e.pointerId);}catch(_){}};const off=()=>{s[key]=false;el.classList.remove('down');};
   el.addEventListener('pointerdown',on);el.addEventListener('pointerup',off);el.addEventListener('pointercancel',off);el.addEventListener('lostpointercapture',off);el.addEventListener('contextmenu',e=>e.preventDefault());
@@ -956,7 +1195,10 @@ function updateDock(){
 
 /* ---------------- chips ---------------- */
 function chip(id,fn){$(id).addEventListener('click',()=>{ac();SND.click();const on=$(id).getAttribute('aria-pressed')!=='true';$(id).setAttribute('aria-pressed',String(on));fn(on);});}
-chip('cCase',on=>{caseG.visible=on;});
+let CLOCK=false;
+$('cLock').onclick=()=>{ac();SND.click();CLOCK=!CLOCK;$('cLock').setAttribute('aria-pressed',String(CLOCK));toast(CLOCK?'ક્લચ દબાયેલો રહેશે. હવે ગિયર પસંદ કરો.':'ક્લચ છૂટો (ધીમે ધીમે ઉપર આવશે)');};
+$('cCase').onclick=()=>{ac();SND.click();CASE_MODE=(CASE_MODE+1)%3;$('cCase').textContent=CASE_TXT[CASE_MODE];applyCase();};
+chip('cExp',on=>{EXP_T=on?1:0;camTouched=false;camTo(on?'exp':'home');toast(on?'છૂટું દૃશ્ય: દરેક ભાગ અલગ દેખાય છે':'ભાગ પાછા જોડાઈ ગયા');});
 chip('cLab',on=>{LAB_ON=on;});
 chip('cFlow',on=>{FLOW=on;});
 chip('cTeach',on=>{TEACH=on;teachApply();});
@@ -1032,12 +1274,12 @@ function speak(t){if(!D.voice||!window.speechSynthesis)return;try{speechSynthesi
 
 /* ---------------- name-the-part game ---------------- */
 const GAME={on:false,target:null,score:0,n:0,total:8,pool:[],flash:null};
-const GAME_PARTS=['fly','disc','press','input','ingear','counter','main','g1','g2','g3','g5','gR','idler','hub','sleeve','ring','dog','fork','rail','flange'];
+const GAME_PARTS=['fly','ringgear','lining','damper','press','diaphragm','cover','rel','relfork','starter','input','ingear','counter','main','g1','g2','g3','g5','gR','idler','hub','sleeve','ring','fork','rail','lever','bear','circlip','speedo','flange','uj','drain'];
 function gameRender(){const b=$('game');
   if(!GAME.on){b.innerHTML='<div class="ctitle">🎯 ભાગ ઓળખો રમત</div><p style="margin:0 0 8px">'+(GAME.n?'<b>છેલ્લો સ્કોર: '+GAME.score+' / '+GAME.n+'</b><br>':'')+'ભાગનું નામ ઉપર દેખાશે, 3D મૉડલમાં તે ભાગ પર ટેપ કરો. '+GAME.total+' પ્રશ્નો.</p><button class="btn pri" id="gGo" type="button">▶ રમત શરૂ કરો</button>';$('gGo').onclick=gameStart;return;}
   b.innerHTML='<div class="ctitle">🎯 ભાગ ઓળખો રમત <small>'+(GAME.n+1)+' / '+GAME.total+'</small></div><div class="gq">શોધો: '+PARTS[GAME.target].n+'</div><div class="gs2"><span>સ્કોર: <b>'+GAME.score+'</b></span><button class="btn" id="gSkip" type="button">છોડો ➜</button><button class="btn" id="gStop" type="button">બંધ</button></div>';
   $('gSkip').onclick=()=>{GAME.n++;gameNext();};$('gStop').onclick=gameStop;}
-function gameStart(){ac();SND.click();demoStop();GAME.on=true;GAME.score=0;GAME.n=0;GAME.pool=shuffle(GAME_PARTS.slice()).slice(0,GAME.total);caseG.visible=true;gameNext();
+function gameStart(){ac();SND.click();demoStop();GAME.on=true;GAME.score=0;GAME.n=0;GAME.pool=shuffle(GAME_PARTS.slice()).slice(0,GAME.total);gameNext();
   if(innerWidth<980)$('bay').scrollIntoView({behavior:reduceMotion?'auto':'smooth',block:'start'});}
 function gameNext(){if(GAME.n>=GAME.total){GAME.on=false;SND.win();toast('રમત પૂરી: '+GAME.score+' / '+GAME.total);gameRender();return;}GAME.target=GAME.pool[GAME.n];gameRender();}
 function gameStop(){GAME.on=false;gameRender();}
@@ -1063,7 +1305,7 @@ function renderTheory(){
     '<tr><td><b>સિંક્રોમેશ</b></td><td>કૉન્સ્ટન્ટ મેશ + સિંક્રોનાઇઝર; ઘર્ષણથી ઝડપ સરખી થયા પછી જ લૉક</td><td>હેલિકલ</td><td>સરળ, શાંત, ઝડપી ગિયર બદલાવ. આજની મોટા ભાગની કાર, બસ, ટ્રક</td></tr></table></div>'+
     '<p>આ સિમ્યુલેટરનું ગિયરબોક્સ <b>5-સ્પીડ સિંક્રોમેશ</b> છે: ત્રણ શાફ્ટ (ઇનપુટ, કાઉન્ટર, મુખ્ય) અને ત્રણ સિંક્રોનાઇઝર (1–2, 3–4, 5–R).</p>')+
   sec(3,'મુખ્ય ભાગો',
-    '<div class="tbl"><table><tr><th>ભાગ</th><th>કામ</th></tr>'+['input','counter','main','g1','idler','hub','sleeve','ring','dog','fork','rail','bear'].map(id=>'<tr><td><b>'+PARTS[id].n+'</b></td><td>'+PARTS[id].d+'</td></tr>').join('')+'</table></div>'+see('part','સિમ્યુલેટરમાં ભાગો જુઓ'))+
+    '<p><b>ક્લચ કેવી રીતે કામ કરે:</b> ડાયાફ્રામ સ્પ્રિંગ પ્રેશર પ્લેટને દબાવે છે, પ્રેશર પ્લેટ ક્લચ પ્લેટને ફ્લાયવ્હીલ સામે દબાવે છે, અને ઘર્ષણથી એન્જિનનો પાવર ઇનપુટ શાફ્ટમાં જાય છે. પેડલ દબાવતાં કેબલ → રિલીઝ ફોર્ક → રિલીઝ બેરિંગ ડાયાફ્રામની આંગળીઓ દબાવે છે, પ્રેશર પ્લેટ પાછળ ખસે છે અને ક્લચ પ્લેટ છૂટી પડે છે.</p><div class="tbl"><table><tr><th>ભાગ</th><th>કામ</th></tr>'+['fly','ringgear','disc','lining','damper','press','diaphragm','cover','rel','relfork','pilot','input','counter','main','g1','idler','hub','sleeve','ring','strut','dog','fork','rail','detent','interlock','bear','needle','circlip','seal','speedo','drain','breather'].map(id=>'<tr><td><b>'+PARTS[id].n+'</b></td><td>'+PARTS[id].d+'</td></tr>').join('')+'</table></div>'+see('part','સિમ્યુલેટરમાં ભાગો જુઓ'))+
   sec(4,'સિંક્રોમેશ કેવી રીતે કામ કરે છે?',
     '<p>સ્લીવ હંમેશા <b>શાફ્ટની ઝડપે</b> ફરે છે અને ગિયર <b>કાઉન્ટર શાફ્ટ જે ઝડપે ફેરવે તે ઝડપે</b>. બંનેની ઝડપ જુદી હોય ત્યારે સીધો લૉક કરીએ તો દાંત અથડાય. બ્લૉકર (બૉક) રિંગ પહેલાં ઝડપ સરખી કરે છે.</p><div class="strokes">'+
     [['var(--slv)','1. ક્લચ દબાવો','ઇનપુટ શાફ્ટ છૂટો','ઇનપુટ શાફ્ટ, ક્લચ પ્લેટ અને કાઉન્ટર શાફ્ટ એન્જિનથી અલગ થાય. હવે તેમને ધીમા/ઝડપી કરવા સહેલા.'],
@@ -1129,6 +1371,14 @@ const Q=[
  {q:'ત્રીજામાંથી બીજા ગિયરમાં (ડાઉનશિફ્ટ) જતી વખતે સિંક્રો રિંગ ઇનપુટ શાફ્ટને શું કરે છે?',o:['ઝડપી કરે','ધીમો કરે','બંધ કરે','ઊંધો ફેરવે'],x:'નીચા ગિયર માટે વધુ rpm જોઈએ. રિંગને વધુ કામ પડે, તેથી ડાઉનશિફ્ટમાં થોડી વધુ મહેનત લાગે.'},
  {q:'રિવર્સ ગિયર લગાડતાં પહેલાં શું કરવું જોઈએ?',o:['ગાડી પૂરી ઊભી રાખવી','20 km/h ઝડપ રાખવી','પૂરી રેસ આપવી','ક્લચ છોડેલો રાખવો'],x:'રિવર્સમાં દિશા ઊલટી છે; ચાલતી ગાડીમાં લગાડવાથી દાંત તૂટી શકે.'},
  {q:'મુખ્ય શાફ્ટ પરના ગિયર શાફ્ટ પર શેના પર ફરે છે?',o:['સોય (નીડલ) રોલર બેરિંગ','સૂકી સપાટી પર','રબર બુશ','ચુંબક'],x:'નીડલ બેરિંગ પાતળા હોય છે અને ઓછી જગ્યામાં વધુ ભાર ઝીલે છે.'},
+ {q:'ક્લચમાં પ્રેશર પ્લેટને ક્લચ પ્લેટ પર કોણ દબાવે છે?',o:['ડાયાફ્રામ સ્પ્રિંગ','રિલીઝ બેરિંગ','પાઇલટ બેરિંગ','ડૅમ્પર સ્પ્રિંગ'],x:'કપ આકારની ડાયાફ્રામ સ્પ્રિંગની બહારની કિનારી પ્રેશર પ્લેટને દબાવે છે.'},
+ {q:'ક્લચ દબાવતાં ચીં-ચીં અવાજ આવે અને છોડતાં બંધ થાય. સંભવિત કારણ?',o:['રિલીઝ બેરિંગ ખરાબ','ક્લચ લાઇનિંગ નવું','ગિયર ઓઇલ વધારે','ટાયર પ્રેશર ઓછું'],x:'પેડલ દબાવીએ ત્યારે જ રિલીઝ બેરિંગ ફરે છે, તેથી ત્યારે જ તેનો અવાજ આવે છે.'},
+ {q:'ક્લચ પ્લેટમાં ટૉર્શનલ ડૅમ્પર સ્પ્રિંગનું કામ શું છે?',o:['ઝટકો અને કંપન શોષવું','પ્લેટ ઠંડી કરવી','ગિયર બદલવો','ઓઇલ ફેંકવું'],x:'ક્લચ પકડે ત્યારે અચાનક આવતો ટૉર્ક અને એન્જિનનું કંપન સ્પ્રિંગ શોષી લે છે.'},
+ {q:'ક્લચ લાઇનિંગ પર તેલ લાગે તો શું થાય?',o:['ક્લચ સ્લિપ થાય','ક્લચ વધુ મજબૂત પકડે','ગિયર સરળતાથી લાગે','કંઈ ફરક ન પડે'],x:'તેલથી ઘર્ષણ ઘટે છે, એટલે રેસ આપતાં rpm વધે પણ ઝડપ ન વધે (સ્લિપ).'},
+ {q:'ફ્લાયવ્હીલ પરના રિંગ ગિયરનું કામ શું છે?',o:['સ્ટાર્ટર મોટરથી એન્જિન ફેરવવું','ગિયરબોક્સ ચલાવવું','ઓઇલ પંપ ચલાવવો','સ્પીડોમીટર ચલાવવું'],x:'સ્ટાર્ટરનો નાનો પિનિયન રિંગ ગિયર સાથે મેશ થઈ એન્જિન ફેરવે છે.'},
+ {q:'ગિયરબોક્સના ડ્રેઇન પ્લગમાં ચુંબક શા માટે હોય છે?',o:['લોખંડની ઝીણી રજ પકડવા','ઓઇલ ગરમ કરવા','પ્લગ ઢીલો ન થાય તે માટે','સ્પીડ સેન્સર માટે'],x:'ગિયર ઘસાતાં નીકળતી રજ ચુંબકે ચોંટી રહે છે, ઓઇલમાં ફરતી નથી.'},
+ {q:'ગિયરબોક્સ પર બ્રીધર (વેન્ટ) શા માટે હોય છે?',o:['ગરમ હવાનું દબાણ બહાર કાઢવા, જેથી સીલ લીક ન થાય','ઓઇલ ભરવા','ઠંડક માટે પંખા તરીકે','અવાજ ઘટાડવા'],x:'ગરમ થતાં અંદરની હવા ફૂલે છે; બ્રીધર બંધ હોય તો દબાણથી સીલમાંથી ઓઇલ નીકળે.'},
+ {q:'સિંક્રો હબમાં સ્ટ્રટ (શિફ્ટિંગ કી) નું કામ શું છે?',o:['સ્લીવ ખસે ત્યારે બ્લૉકર રિંગને કોન તરફ ધકેલવું','ગિયરને શાફ્ટ પર જકડવું','ઓઇલ ફેલાવવું','ગિયર ગણવા'],x:'સ્ટ્રટ ઘર્ષણ શરૂ કરાવે છે; પછી રિંગ ઝડપ સરખી કરે છે.'},
  {q:'સ્લીવના દાંત બ્લૉકર રિંગમાંથી ક્યારે પસાર થઈ શકે?',o:['ગિયર અને શાફ્ટની ઝડપ સરખી થાય ત્યારે','ક્લચ છોડ્યા પછી તરત','રેસ આપીએ ત્યારે','ક્યારેય નહીં'],x:'ઝડપ જુદી હોય ત્યારે ઘર્ષણ ટૉર્ક રિંગને બ્લૉક સ્થિતિમાં રાખે છે. ઝડપ સરખી થતાં રિંગ પાછી ફરે અને રસ્તો ખુલે.'},
 ];
 const MQ={started:false,order:[],i:0,ok:0,done:0,wrong:[],ans:false,cur:null};
