@@ -57,7 +57,7 @@ h1,h2,h3{font-family:var(--fd);line-height:1.2;text-wrap:balance;margin:0}
 .hctl{display:flex;gap:6px;align-items:center;flex:none}
 .tbtn{border:1px solid var(--line);background:var(--panel);border-radius:999px;padding:6px 11px;font-size:13px;font-weight:700;white-space:nowrap;box-shadow:0 2px 0 var(--line)}
 .tbtn[aria-pressed="true"]{border-color:var(--acc);color:var(--acc2)}
-.tabs{position:sticky;top:env(safe-area-inset-top,0px);z-index:30;display:grid;grid-template-columns:repeat(3,1fr);gap:6px;background:var(--bg);padding:4px 0 8px}
+.tabs{position:sticky;top:env(safe-area-inset-top,0px);z-index:30;display:grid;grid-template-columns:repeat(4,1fr);gap:6px;background:var(--bg);padding:4px 0 8px}
 .tab{border:1px solid var(--line);background:var(--panel);border-radius:14px;padding:6px 2px;font-family:var(--fd);font-weight:700;font-size:clamp(14px,3.4vw,17px);line-height:1.2;box-shadow:0 3px 0 var(--line);display:flex;align-items:center;justify-content:center;gap:6px}
 .tab .ti{font-size:18px;line-height:1}
 .tab[aria-selected="true"]{background:var(--acc);color:var(--accInk);border-color:var(--acc2);box-shadow:0 3px 0 var(--acc2)}
@@ -257,6 +257,29 @@ h1,h2,h3{font-family:var(--fd);line-height:1.2;text-wrap:balance;margin:0}
 footer{margin-top:18px;text-align:center;color:var(--mute);font-size:12.5px}
 .toast{position:fixed;left:50%;bottom:calc(18px + env(safe-area-inset-bottom,0px));transform:translate(-50%,30px);opacity:0;z-index:200;background:var(--ink);color:var(--bg);padding:9px 16px;border-radius:12px;font-weight:700;font-size:14px;pointer-events:none;transition:all .25s;max-width:calc(100vw - 32px);text-align:center}
 .toast.show{opacity:1;transform:translate(-50%,0)}
+/* demonstration tab: 3D view + chapter player, no driving controls */
+body.demomode .dock,body.demomode #side,body.demomode .banner .bs{display:none}
+.dpanel{display:none;gap:10px;align-content:start;min-width:0}
+body.demomode .dpanel{display:grid}
+@media (min-width:980px){body.demomode .dpanel{overflow-y:auto;min-height:0}}
+@media (max-width:979px){body.demomode .bay{height:max(260px,calc(var(--avail,640px)*.6))}}
+.dnow{border:2px solid var(--acc);border-radius:16px;padding:12px;background:color-mix(in srgb,var(--acc) 7%,var(--panel));display:grid;gap:6px}
+.dnow .ch{font-size:12.5px;font-weight:700;color:var(--acc2)}
+.dnow h3{font-size:clamp(18px,2.4vw,23px);font-weight:800;line-height:1.25}
+.dnow p{margin:0;font-size:15.5px;line-height:1.6}
+.dbar{height:6px;border-radius:3px;background:var(--panel2);overflow:hidden}.dbar i{display:block;height:100%;width:0;background:var(--acc)}
+.dctl{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.dctl .btn{min-width:44px}
+.chap{display:grid;gap:6px;list-style:none;margin:0;padding:0}
+.chap button{width:100%;display:grid;grid-template-columns:30px minmax(0,1fr) auto;gap:8px;align-items:center;text-align:left;border:1.5px solid var(--line);background:var(--panel2);border-radius:14px;padding:8px 10px;box-shadow:0 2px 0 var(--line)}
+.chap .no{width:28px;height:28px;border-radius:9px;background:var(--line);display:grid;place-items:center;font:700 13px var(--fm)}
+.chap b{display:block;font-family:var(--fd);font-size:15.5px;line-height:1.25}
+.chap small{display:block;color:var(--mute);font-size:12.5px;line-height:1.35}
+.chap .st{font-size:12px;font-weight:700;color:var(--mute);white-space:nowrap}
+.chap button.on{border-color:var(--acc);background:color-mix(in srgb,var(--acc) 10%,var(--panel))}
+.chap button.on .no{background:var(--acc);color:var(--accInk)}
+.chap button.done .no{background:var(--ok);color:#fff}
+@media (max-width:560px){.tab{flex-direction:column;gap:0;font-size:12.5px;padding:4px 1px}.tab .ti{font-size:17px}}
 @media (max-width:560px){.brand p{display:none}.tbtn .tl{display:none}}
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 </style>
@@ -274,6 +297,7 @@ footer{margin-top:18px;text-align:center;color:var(--mute);font-size:12.5px}
 
 <nav class="tabs" id="tabs" role="tablist">
   <button class="tab" role="tab" data-p="sim" aria-selected="true" type="button"><span class="ti">🛠️</span>સિમ્યુલેટર</button>
+  <button class="tab" role="tab" data-p="demo" aria-selected="false" type="button"><span class="ti">🎬</span>ડેમો</button>
   <button class="tab" role="tab" data-p="th" aria-selected="false" type="button"><span class="ti">📘</span>થિયરી</button>
   <button class="tab" role="tab" data-p="mcq" aria-selected="false" type="button"><span class="ti">📝</span>MCQ</button>
 </nav>
@@ -329,6 +353,16 @@ footer{margin-top:18px;text-align:center;color:var(--mute);font-size:12.5px}
       </div>
       <div class="stepbar" id="stepbar"><span>1 ક્લચ</span><span>2 સ્લીવ</span><span>3 સિંક્રો</span><span>4 લૉક</span><span>5 ક્લચ છોડો</span></div>
     </div>
+  </div>
+
+  <div class="dpanel" id="dpanel">
+    <div class="card" style="display:grid;gap:10px">
+      <div class="ctitle" style="margin:0">🎬 ગિયરબોક્સ કેવી રીતે કામ કરે છે <small>જુઓ અને સમજો</small></div>
+      <div class="dnow"><span class="ch" id="dnCh">પ્રકરણ પસંદ કરો</span><h3 id="dnT">નીચેથી કોઈ પ્રકરણ શરૂ કરો, અથવા "બધું શરૂઆતથી" દબાવો.</h3><p id="dnX">દરેક પગલામાં 3D મૉડલ જાતે ફરશે, ઝૂમ થશે અને જે ભાગની વાત થાય તે ગુલાબી ચમકશે.</p><div class="dbar"><i id="dnBar"></i></div></div>
+      <div class="dctl"><button class="btn pri" id="dnAll" type="button">▶ બધું શરૂઆતથી</button><button class="btn" id="dnPrev" type="button" aria-label="પાછળ">⏮</button><button class="btn" id="dnPause" type="button" aria-label="થોભો">⏸</button><button class="btn" id="dnNext" type="button" aria-label="આગળ">⏭</button><button class="btn" id="dnStop" type="button" aria-label="બંધ">⏹</button></div>
+      <div class="drow" style="margin:0"><span>ઝડપ</span><div class="seg" id="dnSpeed"><button data-s="0.6" type="button">0.5×</button><button data-s="1" aria-pressed="true" type="button">1×</button><button data-s="1.8" type="button">2×</button></div><button class="chip" id="dnVoice" type="button" aria-pressed="false">🗣 અવાજમાં</button></div>
+    </div>
+    <div class="card"><div class="ctitle">📚 પ્રકરણ <small>ક્રમમાં જોશો તો સૌથી સરળ</small></div><ol class="chap" id="chap"></ol></div>
   </div>
 
   <div class="side" id="side">
@@ -429,7 +463,7 @@ function humStart(){const a=AC;if(!a||HUM)return;try{
   const o1=a.createOscillator(),o2=a.createOscillator(),wh=a.createOscillator(),f=a.createBiquadFilter(),g=a.createGain(),gw=a.createGain();
   o1.type='sawtooth';o2.type='square';wh.type='sine';f.type='lowpass';f.frequency.value=300;f.Q.value=3;g.gain.value=0;gw.gain.value=0;
   o1.connect(f);o2.connect(f);f.connect(g);g.connect(MG);wh.connect(gw);gw.connect(MG);o1.start();o2.start();wh.start();HUM={o1,o2,wh,f,g,gw};}catch(e){}}
-function humUpdate(){if(!HUM||!AC)return;const t=AC.currentTime;const on=!MUTE&&s.running&&state.tab==='sim'&&!document.hidden&&s.E>150;
+function humUpdate(){if(!HUM||!AC)return;const t=AC.currentTime;const on=!MUTE&&s.running&&(state.tab==='sim'||state.tab==='demo')&&!document.hidden&&s.E>150;
   const fire=Math.max(10,s.E/30);HUM.o1.frequency.setTargetAtTime(fire,t,.04);HUM.o2.frequency.setTargetAtTime(fire*.5,t,.04);
   HUM.f.frequency.setTargetAtTime(220+s.th*1300+s.E*.09,t,.05);HUM.g.gain.setTargetAtTime(on?.045+s.th*.06:0,t,.08);
   const wf=Math.abs(s.I)/60*18;HUM.wh.frequency.setTargetAtTime(Math.max(40,wf),t,.04);HUM.gw.gain.setTargetAtTime(on?Math.min(.018,Math.abs(s.I)/7000*.022):0,t,.1);}
@@ -823,16 +857,18 @@ const caseG=grp(root);
  const tw=add(caseG,'tower',new THREE.BoxGeometry(1.1,.32,.9),cmat('alu'),-.15,1.66,0,[],true);tw.userData.case=1;}
 add(root,'seal',ring(.14,.24,.06,28),mat('rubber'),4.47,0,0,[],true);
 // drain plug with magnet, filler plug, breather, reverse-light switch
-add(root,'drain',new THREE.CylinderGeometry(.09,.09,.07,6),mat('zinc'),.8,-2.79,0);
-add(root,'drain',new THREE.CylinderGeometry(.11,.11,.015,24),mat('copper'),.8,-2.745,0,[],true);
-add(root,'drain',new THREE.CylinderGeometry(.05,.05,.07,16),mat('dark'),.8,-2.66,0,[],true);
-{const f=add(root,'filler',new THREE.CylinderGeometry(.09,.09,.07,6),mat('zinc'),-.6,-1.95,-1.34);f.rotation.x=Math.PI/2;}
-add(root,'breather',new THREE.CylinderGeometry(.035,.035,.12,12),mat('bright'),1.0,1.56,-.35,[],true);
-add(root,'breather',new THREE.CylinderGeometry(.07,.07,.04,16),mat('rubber'),1.0,1.63,-.35,[],true);
-add(root,'revsw',new THREE.CylinderGeometry(.075,.075,.09,6),mat('zinc'),2.95,1.55,.34,[],true);
-add(root,'revsw',new THREE.BoxGeometry(.12,.12,.1),mat('plastic'),2.95,1.66,.34,[],true);
+// parts bolted to the casing hide with it (otherwise they float in the air)
+const attG=grp(root);
+add(attG,'drain',new THREE.CylinderGeometry(.09,.09,.07,6),mat('zinc'),.8,-2.79,0);
+add(attG,'drain',new THREE.CylinderGeometry(.11,.11,.015,24),mat('copper'),.8,-2.745,0,[],true);
+add(attG,'drain',new THREE.CylinderGeometry(.05,.05,.07,16),mat('dark'),.8,-2.66,0,[],true);
+{const f=add(attG,'filler',new THREE.CylinderGeometry(.09,.09,.07,6),mat('zinc'),-.6,-1.95,-1.34);f.rotation.x=Math.PI/2;}
+add(attG,'breather',new THREE.CylinderGeometry(.035,.035,.12,12),mat('bright'),1.0,1.56,-.35,[],true);
+add(attG,'breather',new THREE.CylinderGeometry(.07,.07,.04,16),mat('rubber'),1.0,1.63,-.35,[],true);
+add(attG,'revsw',new THREE.CylinderGeometry(.075,.075,.09,6),mat('zinc'),2.95,1.55,.34,[],true);
+add(attG,'revsw',new THREE.BoxGeometry(.12,.12,.1),mat('plastic'),2.95,1.66,.34,[],true);
 // gearbox mount under the extension
-const mountG=ex(grp(root),2.2,-.6,0);
+const mountG=ex(grp(attG),2.2,-.6,0);
 add(mountG,'mount',new THREE.BoxGeometry(.42,.26,.5),mat('rubber'),4.1,-.6,0);
 add(mountG,'mount',new THREE.BoxGeometry(.85,.04,.95),mat('paint'),4.1,-.75,0);
 add(mountG,'mount',new THREE.BoxGeometry(.5,.04,.6),mat('paint'),4.1,-.45,0);
@@ -860,7 +896,7 @@ add(outG,'uj',new THREE.CylinderGeometry(.05,.05,.72,12),mat('bright'),5.27,0,0)
 inst(outG,'uj',new THREE.CylinderGeometry(.075,.075,.08,16),mat('dark'),[[5.27,.36,0],[5.27,-.36,0],[5.27,0,.36,Math.PI/2],[5.27,0,-.36,Math.PI/2]]);
 add(outG,'prop',cylX(.24,1.0,32),mat('paint'),6.1,0,0,['main']);
 // speedo driven gear (rotates on its own axis)
-const spPin=ex(grp(root,4.0,-.335,0),2.0,-.5,0);
+const spPin=ex(grp(attG,4.0,-.335,0),2.0,-.5,0);
 {const pg=gearGeo(14,.022,.08,.03,0,1);pg.rotateY(-Math.PI/2);G.spPin=add(spPin,'speedopin',pg,mat('cream'),0,0,0,[],true);
  add(spPin,'speedopin',new THREE.CylinderGeometry(.09,.09,.42,16),mat('plastic'),0,-.3,0,[],true);
  add(spPin,'speedopin',new THREE.TubeGeometry(new THREE.CatmullRomCurve3([new THREE.Vector3(0,-.5,0),new THREE.Vector3(.1,-.85,0),new THREE.Vector3(.5,-1.0,0)]),16,.03,8,false),mat('rubber'),0,0,0,[],true);}
@@ -920,14 +956,14 @@ for(const hb in HUBS){const H=HUBS[hb];const g=ex(grp(root,H.x),H.x*.55,1.1,0);f
   add(g,'fork',new THREE.BoxGeometry(.24,.15,.17),mat('fork'),0,RAIL_Y,H.rz);
 }
 // detent balls + springs + plugs above each rail, interlock pins between rails
-const detG=ex(grp(root),0,1.25,0);
+const detG=ex(grp(root),0,1.25,0),detP=ex(grp(attG),0,1.25,0);
 for(const hb in HUBS){const H=HUBS[hb];
   add(detG,'detent',new THREE.SphereGeometry(.042,14,10),mat('bright'),-3.0,RAIL_Y+.1,H.rz,[],true);
   const sp=add(detG,'detent',springGeo(.03,.2,6,.007),mat('spring'),-3.0,RAIL_Y+.25,H.rz,[],true);sp.rotation.x=-Math.PI/2;
-  add(detG,'detent',new THREE.CylinderGeometry(.065,.065,.07,6),mat('zinc'),-3.0,1.55,H.rz,[],true);}
+  add(detP,'detent',new THREE.CylinderGeometry(.065,.065,.07,6),mat('zinc'),-3.0,1.55,H.rz,[],true);}
 inst(detG,'interlock',new THREE.CylinderGeometry(.028,.028,.2,10),mat('bright'),[[-3.0,RAIL_Y,-.17,Math.PI/2],[-3.0,RAIL_Y,.17,Math.PI/2]]);
 // gear lever: ball pivot, chrome rod, black knob with shift pattern, rubber boot
-const levG=ex(grp(root),0,1.5,0);
+const levG=ex(grp(attG),0,1.5,0);
 G.lever=grp(levG,-.15,1.86,0);
 add(G.lever,'lever',new THREE.SphereGeometry(.1,20,14),mat('zinc'),0,0,0,[],true);
 add(G.lever,'lever',new THREE.CylinderGeometry(.034,.04,1.3,16),mat('chrome'),0,.65,0,[],true);
@@ -1129,9 +1165,12 @@ function animateModel(dt,now){
   // exploded view
   EXP+=(EXP_T-EXP)*Math.min(1,dt/(s.slow?.2:1)*3.2);if(Math.abs(EXP_T-EXP)<.001)EXP=EXP_T;
   SYN+=(SYN_T-SYN)*Math.min(1,dt/(s.slow?.2:1)*3);if(Math.abs(SYN_T-SYN)<.001)SYN=SYN_T;
-  for(const o of EXO){const u=o.userData;o.position.set(u.b.x+u.o.x*EXP+u.d.x+u.sy.x*SYN,u.b.y+u.o.y*EXP+u.d.y+u.sy.y*SYN,u.b.z+u.o.z*EXP+u.d.z+u.sy.z*SYN);}
+  const ma=-G.main.rotation.x,mc=Math.cos(ma),ms=Math.sin(ma);
+  for(const o of EXO){const u=o.userData;let oy=u.o.y*EXP+u.sy.y*SYN,oz=u.o.z*EXP+u.sy.z*SYN;
+    if(o.parent===G.main){const y2=oy*mc-oz*ms;oz=oy*ms+oz*mc;oy=y2;}   // undo the shaft's spin so lifted parts stay above it
+    o.position.set(u.b.x+u.o.x*EXP+u.d.x+u.sy.x*SYN,u.b.y+oy+u.d.y,u.b.z+oz+u.d.z);}
   slvG.h12.rotation.y=-SYN*.75;ringM['1'].grp.rotation.y=-SYN*.5;ringM['2'].grp.rotation.y=SYN*.5;
-  caseG.visible=CASE_MODE!==2&&EXP<.15&&!SYNF;floor.position.y=FLOOR_Y-EXP*.9;grid.position.y=floor.position.y+.002;
+  caseG.visible=CASE_MODE!==2&&EXP<.15&&!SYNF;attG.visible=(CASE_MODE!==2||EXP>.15)&&!SYNF;floor.position.y=FLOOR_Y-EXP*.9;grid.position.y=floor.position.y+.002;
   // emissive: power flow, sync heat, selection
   const tags=FLOW?pathTags():null;const pulse=.5+.5*Math.sin(now/180);const c=coup(s.p);
   const syncId=(s.phase==='sync'||s.phase==='grind')?s.shiftFor:null;const heat=syncId?clamp(Math.abs(outRpm()*GD[syncId].r-s.I)/1500,.25,1):0;
@@ -1209,7 +1248,7 @@ function holdBtn(el,key){const on=e=>{e.preventDefault();ac();demoStop();s[key]=
   el.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();s[key]=true;}});el.addEventListener('keyup',e=>{if(e.key==='Enter'||e.key===' ')s[key]=false;});}
 holdBtn($('pClutch'),'pHold');holdBtn($('pGas'),'gHold');holdBtn($('pBrake'),'bHold');
 const KEYMAP={' ':'pHold',ArrowUp:'gHold',ArrowDown:'bHold'};
-addEventListener('keydown',e=>{if(state.tab!=='sim')return;const t=e.target;if(t&&t.closest&&t.closest('button,[role="button"],input')&&(e.key===' '||e.key==='Enter'))return;
+addEventListener('keydown',e=>{if(state.tab!=='sim'&&state.tab!=='demo')return;const t=e.target;if(t&&t.closest&&t.closest('button,[role="button"],input')&&(e.key===' '||e.key==='Enter'))return;
   if(KEYMAP[e.key]){e.preventDefault();ac();demoStop();s[KEYMAP[e.key]]=true;return;}const k=e.key.toUpperCase();if(SPOTS[k]&&!e.ctrlKey&&!e.metaKey){ac();userGear(k);}});
 addEventListener('keyup',e=>{if(KEYMAP[e.key])s[KEYMAP[e.key]]=false;});
 addEventListener('blur',()=>{s.pHold=s.gHold=s.bHold=false;});
@@ -1357,10 +1396,33 @@ const DEMOS={
   {t:'પાંચમો ગિયર: ઓવરડ્રાઇવ',x:'પાંચમામાં મુખ્ય શાફ્ટ એન્જિન કરતાં ઝડપી ફરે છે (0.84 : 1). હાઇવે પર ઇંધણ બચે છે. ડેમો પૂરો!',d:5,cam:'home',a(){A.gas(.4);}},
  ],
 };
-function demoStart(k){ac();SND.click();if(GAME.on)gameStop();if(D.on)demoStop();D.prev={ID,FLOW,TEACH};D.list=DEMOS[k];D.on=true;D.paused=false;$('dcPause').textContent='⏸';demoGo(0);
+function demoStart(k,course){ac();SND.click();if(GAME.on)gameStop();if(D.on)demoStop();D.course=!!course;D.key=k;D.prev={ID,FLOW,TEACH};D.list=DEMOS[k];D.on=true;D.paused=false;$('dcPause').textContent='⏸';demoGo(0);
   if(innerWidth<980)$('bay').scrollIntoView({behavior:reduceMotion?'auto':'smooth',block:'start'});}
-function demoGo(i){if(i>=D.list.length){demoStop();toast('ડેમો પૂરો ✓');SND.win();return;}D.i=clamp(i,0,D.list.length-1);const st=D.list[D.i];D.t=0;D.dur=st.d;st.a&&st.a();if(st.cam)camTo(st.cam);speak(st.t+'. '+st.x);}
+function demoGo(i){if(i>=D.list.length){const k=D.key,course=D.course;CH_DONE.add(k);demoStop();SND.win();const ni=CHAPTERS.findIndex(c=>c.k===k)+1;
+    if(course&&ni<CHAPTERS.length){toast('આગળનું પ્રકરણ: '+CHAPTERS[ni].t);setTimeout(()=>{if(!D.on&&state.tab==='demo')demoStart(CHAPTERS[ni].k,true);},1600);}else toast('ડેમો પૂરો ✓');return;}D.i=clamp(i,0,D.list.length-1);const st=D.list[D.i];D.t=0;D.dur=st.d;st.a&&st.a();if(st.cam)camTo(st.cam);speak(st.t+'. '+st.x);}
 function demoStop(){if(!D.on)return;D.on=false;s.pDemo=null;s.thDemo=null;s.hold=null;if(SYNF)synFocus(false);if(EXP_T)A.exp(0);s.slow=false;setChip('cSlow',false);if(D.prev){A.id(D.prev.ID);A.flow(D.prev.FLOW);if(TEACH!==D.prev.TEACH)A.teach(D.prev.TEACH);}try{speechSynthesis.cancel();}catch(e){}}
+const CHAPTERS=[
+  {k:'power',t:'પાવર ક્યાંથી ક્યાં જાય?',x:'3 શાફ્ટ ઓળખો: કોણ કોને ફેરવે છે'},
+  {k:'synpart',t:'સિંક્રો ખોલીને જુઓ',x:'સ્પ્લાઇન, હબ, સ્લીવ, બ્લૉકર રિંગ, ડૉગ દાંત'},
+  {k:'sync',t:'સિંક્રોમેશ કેવી રીતે કામ કરે',x:'ક્લચ → સ્લીવ → ઘર્ષણ → લૉક'},
+  {k:'flow',t:'દરેક ગિયરનો પાવર ફ્લો',x:'1, 2, 3, 4, 5 અને R: દાંત અને રેશિયો'},
+  {k:'grind',t:'ક્લચ વગર ગિયર બદલો તો?',x:'ઘસારો કેમ થાય અને સાચી રીત'},
+  {k:'drive',t:'1 થી 5 ગિયર સુધી ડ્રાઇવ',x:'આખી ડ્રાઇવ, ગિયર બદલતાં rpm'},
+];
+const CH_DONE=new Set();
+function chapRender(){$('chap').innerHTML=CHAPTERS.map((c,i)=>'<li><button type="button" data-k="'+c.k+'" class="'+(D.on&&D.key===c.k?'on':CH_DONE.has(c.k)?'done':'')+'"><span class="no">'+(CH_DONE.has(c.k)&&!(D.on&&D.key===c.k)?'✓':i+1)+'</span><span><b>'+c.t+'</b><small>'+c.x+' · '+DEMOS[c.k].length+' પગલાં</small></span><span class="st">'+(D.on&&D.key===c.k?'▶ ચાલુ':'')+'</span></button></li>').join('');}
+$('chap').addEventListener('click',e=>{const b=e.target.closest('button[data-k]');if(!b)return;demoStart(b.dataset.k,false);chapRender();});
+$('dnAll').onclick=()=>{CH_DONE.clear();demoStart('power',true);chapRender();};
+$('dnPrev').onclick=()=>{if(D.on){SND.click();demoGo(D.i-1);}};$('dnNext').onclick=()=>{if(D.on){SND.click();demoGo(D.i+1);}};
+$('dnPause').onclick=()=>{if(!D.on)return;SND.click();D.paused=!D.paused;$('dnPause').textContent=$('dcPause').textContent=D.paused?'▶':'⏸';};
+$('dnStop').onclick=()=>{SND.click();D.course=false;demoStop();chapRender();};
+$('dnSpeed').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;D.speed=+b.dataset.s;[...$('dnSpeed').children,...$('dSpeed').children].forEach(x=>x.setAttribute('aria-pressed',String(+x.dataset.s===D.speed)));});
+$('dnVoice').onclick=()=>{D.voice=!D.voice;$('dnVoice').setAttribute('aria-pressed',String(D.voice));$('dVoice').setAttribute('aria-pressed',String(D.voice));if(!D.voice)try{speechSynthesis.cancel();}catch(e){}};
+let lastDn='';
+function updateDemoPanel(){if(state.tab!=='demo')return;const key=D.on?D.key+D.i:'-';
+  if(key!==lastDn){lastDn=key;chapRender();if(D.on){const c=CHAPTERS.find(x=>x.k===D.key),st=D.list[D.i];$('dnCh').textContent='પ્રકરણ '+(CHAPTERS.indexOf(c)+1)+': '+c.t+' · પગલું '+(D.i+1)+' / '+D.list.length;$('dnT').textContent=st.t;$('dnX').textContent=st.x;}
+    else{$('dnCh').textContent=CH_DONE.size?'પ્રકરણ પૂરું ✓ ('+CH_DONE.size+' / '+CHAPTERS.length+')':'પ્રકરણ પસંદ કરો';$('dnT').textContent=CH_DONE.size?'શાબાશ! આગળનું પ્રકરણ પસંદ કરો.':'નીચેથી કોઈ પ્રકરણ શરૂ કરો, અથવા "બધું શરૂઆતથી" દબાવો.';$('dnX').textContent='દરેક પગલામાં 3D મૉડલ જાતે ફરશે, ઝૂમ થશે અને જે ભાગની વાત થાય તે ગુલાબી ચમકશે. 3D મૉડલને આંગળીથી ફેરવી પણ શકો છો.';}}
+  $('dnBar').style.width=(D.on?clamp(D.t/D.dur,0,1)*100:0)+'%';$('dnPause').textContent=D.paused?'▶':'⏸';}
 $('dPower').onclick=()=>demoStart('power');$('dSynPart').onclick=()=>demoStart('synpart');$('dSync').onclick=()=>demoStart('sync');$('dFlow').onclick=()=>demoStart('flow');$('dGrind').onclick=()=>demoStart('grind');$('dDrive').onclick=()=>demoStart('drive');
 $('dcPrev').onclick=()=>{SND.click();demoGo(D.i-1);};$('dcNext').onclick=()=>{SND.click();demoGo(D.i+1);};
 $('dcPause').onclick=()=>{SND.click();D.paused=!D.paused;$('dcPause').textContent=D.paused?'▶':'⏸';};
@@ -1448,7 +1510,7 @@ function renderTheory(){
      ['ઓઇલ લીક','ઓઇલ સીલ કે ગાસ્કેટ ખરાબ, વેન્ટ બંધ']].map(r=>'<tr><td><b>'+r[0]+'</b></td><td>'+r[1]+'</td></tr>').join('')+'</table></div>'+see('grind','ડેમો: ક્લચ વગર ગિયર બદલો તો?'))+
   sec(11,'જાળવણી',
     '<ul><li><b>ઓઇલ:</b> મૅન્યુઅલ સિંક્રોમેશ માટે સામાન્ય રીતે <b>GL-4</b> ગિયર ઓઇલ (75W-90 / 80W-90) અથવા ઉત્પાદક કહે તે. GL-5 ના કેટલાક ઉમેરણ પિત્તળની રિંગને નુકસાન કરી શકે.</li><li><b>લેવલ:</b> ગાડી સમતલ પર, ફિલર પ્લગના કાણાની નીચલી ધાર સુધી.</li><li><b>બદલવાનો સમય:</b> સર્વિસ મૅન્યુઅલ મુજબ (ઘણી ગાડીઓમાં 40,000–80,000 km).</li><li><b>ડ્રાઇવિંગ:</b> ગિયર બદલતાં ક્લચ પૂરો દબાવો, લીવર પર હાથ ટેકવી ન રાખો (ફોર્ક ઘસાય), ગાડી ઊભી રાખીને જ રિવર્સ.</li></ul>');
-  $('thBox').querySelectorAll('[data-demo]').forEach(b=>b.onclick=()=>{showTab('sim');const k=b.dataset.demo;if(k==='part'){selectPart('ring',true);}else setTimeout(()=>demoStart(k),150);});
+  $('thBox').querySelectorAll('[data-demo]').forEach(b=>b.onclick=()=>{const k=b.dataset.demo;showTab(k==='part'?'sim':'demo');if(k==='part'){selectPart('ring',true);}else setTimeout(()=>demoStart(k),150);});
 }
 
 /* ---------------- MCQ ---------------- */
@@ -1517,16 +1579,17 @@ $('mqBox').addEventListener('click',e=>{const b=e.target.closest('.opt');if(!b||
   $('mqFb').scrollIntoView({behavior:reduceMotion?'auto':'smooth',block:'nearest'});});
 
 /* ---------------- tabs ---------------- */
-function showTab(t){state.tab=t;document.querySelectorAll('.tab').forEach(b=>b.setAttribute('aria-selected',String(b.dataset.p===t)));
-  $('pSim').hidden=t!=='sim';$('pTh').hidden=t!=='th';$('pMcq').hidden=t!=='mcq';
-  if(t==='th')renderTheory();if(t==='mcq')mqRender();if(t!=='sim'){demoStop();}else setTimeout(()=>{fit();resize();},0);window.scrollTo({top:0});}
+function showTab(t){const was=state.tab;state.tab=t;document.querySelectorAll('.tab').forEach(b=>b.setAttribute('aria-selected',String(b.dataset.p===t)));
+  const sim=t==='sim'||t==='demo';$('pSim').hidden=!sim;$('pTh').hidden=t!=='th';$('pMcq').hidden=t!=='mcq';document.body.classList.toggle('demomode',t==='demo');
+  if(t==='th')renderTheory();if(t==='mcq')mqRender();if(!sim||(was==='demo'&&t==='sim'&&D.course)){D.course=false;demoStop();}
+  if(sim)setTimeout(()=>{fit();resize();lastDn='';updateDemoPanel();},0);window.scrollTo({top:0});}
 $('tabs').addEventListener('click',e=>{const b=e.target.closest('.tab');if(!b)return;ac();SND.click();showTab(b.dataset.p);});
 
 /* ---------------- loop ---------------- */
 let last=performance.now(),uiT=0;
 function frame(now){requestAnimationFrame(frame);
   const dtReal=Math.min(.05,(now-last)/1000);last=now;
-  if(state.tab!=='sim'||document.hidden){humUpdate();return;}
+  if((state.tab!=='sim'&&state.tab!=='demo')||document.hidden){humUpdate();return;}
   const dt=dtReal*(s.slow?.2:1);
   if(D.on&&!D.paused){D.t+=dtReal*D.speed;if(D.t>=D.dur)demoGo(D.i+1);}
   inputs(dt);shift(dt);for(let i=0;i<10;i++)physics(dt/10);
@@ -1534,7 +1597,7 @@ function frame(now){requestAnimationFrame(frame);
   if(camAnim){camAnim.k=Math.min(1,camAnim.k+dtReal/1.1);const e=camAnim.k<.5?2*camAnim.k*camAnim.k:1-Math.pow(-2*camAnim.k+2,2)/2;camera.position.lerpVectors(camAnim.p0,camAnim.p1,e);controls.target.lerpVectors(camAnim.t0,camAnim.t1,e);if(camAnim.k>=1)camAnim=null;}
   controls.update();renderer.render(scene,camera);
   updateLabels();knob(dtReal);drawSC(dtReal);
-  uiT+=dtReal;if(uiT>.05){uiT=0;updateBanner();updateDock();}
+  uiT+=dtReal;if(uiT>.05){uiT=0;updateBanner();updateDock();updateDemoPanel();}
   humUpdate();
 }
 requestAnimationFrame(frame);
