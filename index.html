@@ -319,6 +319,7 @@ body.demomode .dpanel{display:grid}
       <div class="bayctl">
         <button class="chip" id="cCase" type="button">✂️ કટઅવે</button>
         <button class="chip" id="cId" type="button" aria-pressed="false">🔎 શાફ્ટ ઓળખો</button>
+        <button class="chip" id="cJoint" type="button" aria-pressed="false">🔗 જોડાણ</button>
         <button class="chip" id="cSyn" type="button" aria-pressed="false">🔬 સિંક્રો ખોલો</button>
         <button class="chip" id="cExp" type="button" aria-pressed="false">💥 છૂટું</button>
         <button class="chip" id="cLab" type="button" aria-pressed="true">🏷 લેબલ</button>
@@ -782,7 +783,7 @@ inst(stG,'starter',cylX(.03,.1,8),mat('copper'),[[-3.98,-.28,-.36],[-3.98,-.36,-
 add(stG,'starter',gearGeo(10,.023,.13,.0,0,1),mat('bright'),-5.47,0,0);
 // ---- input shaft + clutch disc (rotate together)
 G.in=ex(grp(root),-1.6,0,0);
-add(G.in,'input',cylX(.14,2.6,24),mat('shaft'),-4.28,0,0,['in']);
+add(G.in,'input',cylX(.14,2.58,24),mat('shaft'),-4.29,0,0,['in']);
 add(G.in,'input',cylX(.075,.1,16),mat('shaft'),-5.62,0,0,['in']);
 add(G.in,'input',gearGeo(20,.016,.5,0,0,1.0),mat('shaft'),-5.15,0,0,['in']);
 G.disc=ex(grp(G.in,-5.27),-.83,0,0);
@@ -836,7 +837,10 @@ add(G.rfork,'relfork',new THREE.SphereGeometry(.07,16,12),mat('bright'),.06,0,0,
 add(root,'cable',new THREE.TubeGeometry(new THREE.CatmullRomCurve3([new THREE.Vector3(-4.6,-1.85,0),new THREE.Vector3(-5.0,-2.15,0),new THREE.Vector3(-5.6,-2.25,.1),new THREE.Vector3(-6.0,-2.0,.4)]),24,.03,8,false),mat('rubber'));
 // ---- input drive gear (part of the input shaft)
 const inGearG=grp(G.in,GD['4'].x);
-const inGear=add(inGearG,'ingear',gearGeo(18,M,.40,.13,.36),mat('gear'),0,0,0,['in']);
+const inGear=add(inGearG,'ingear',gearGeo(18,M,.40,.16,.36),mat('gear'),0,0,0,['in']);
+// front half of the gear is solid (input shaft); the back half is a pocket for the output-shaft spigot
+add(inGearG,'ingear',ring(.13,.165,.25,32),mat('gear'),-.075,0,0,['in'],true);
+add(inGearG,'ingear',ring(.16,.17,.15,32),mat('machined',{side:THREE.DoubleSide}),.125,0,0,['in'],true);
 // ---- bell housing, main casing, extension housing, shift tower, oil (cut-away together)
 const caseG=grp(root);
 {const bell=lathe([[1.76,-5.33],[1.8,-5.25],[1.66,-4.7],[1.42,-3.9],[1.32,-3.62]],64);
@@ -880,7 +884,8 @@ for(const id in GD){const g=GD[id];const Zc=g.Zc;const m=add(G.cs,'counter',gear
   const p=TAU/Zc;m.userData.a0=Math.PI/2-p/2;m.rotation.x=m.userData.a0;csGears[id]=m;}
 // ---- main shaft group (rotates with output)
 G.main=grp(root);
-const mainShaft=add(G.main,'main',cylX(.13,7.25,24),mat('shaft'),.75,0,0,['main']);mainShaft.userData.syn=1;G.main.userData.syn=1;
+const mainShaft=add(G.main,'main',cylX(.13,7.225,24),mat('shaft'),.7625,0,0,['main']);mainShaft.userData.syn=1;G.main.userData.syn=1;
+const spigot=add(G.main,'main',cylX(.095,.15,24),mat('machined'),-2.92,0,0,['main']);   // turned-down nose that sits in the input-gear pocket
 // speedometer worm + output flange, UJ, propeller shaft
 const spW=ex(grp(G.main,4.0),2.0,0,0);
 add(spW,'speedo',cylX(.15,.24,24),mat('bright'),0,0,0,['main']);
@@ -908,7 +913,8 @@ for(const id of ['1','2','3','5','R']){const g=GD[id];const gr=ex(grp(root,g.x),
   inst(nd,'needle',cylX(.012,g.w*.85,6),mat('bright'),[...Array(16)].map((_,i)=>{const a=i/16*TAU;return [0,Math.cos(a)*.142,Math.sin(a)*.142];}));
   const wx=g.x-g.side*(g.w/2+.012);const wa=ex(grp(G.main,wx),wx*.55-g.side*.5,0,0);add(wa,'washer',ring(.14,.3,.02,32),mat('zinc'),0,0,0,[],true);}
 mG['4']=inGearG;mGear['4']=inGear;
-{const pn=grp(G.in,-2.93);inst(pn,'pilot2',cylX(.012,.12,6),mat('bright'),[...Array(14)].map((_,i)=>{const a=i/14*TAU;return [0,Math.cos(a)*.142,Math.sin(a)*.142];}));}
+{const pn=grp(G.in,-2.92);inst(pn,'pilot2',cylX(.026,.12,10),mat('bright'),[...Array(11)].map((_,i)=>{const a=i/11*TAU;return [0,Math.cos(a)*.128,Math.sin(a)*.128];}));
+ add(pn,'pilot2',ring(.122,.134,.05,32),mat('brass',{side:THREE.DoubleSide}),0,0,0,[],true);}
 for(const id in GD){const g=GD[id];const hx=HUBS[g.hub].x,sd=g.side;const gp=mG[id];
   const dogX=hx+sd*.47-g.x,coneX=hx+sd*.38-g.x;const tg=[id==='4'?'in':'mg:'+id,'dog:'+id];
   add(gp,'dog',gearGeo(28,.024,.10,.15,0,1.0),mat('gear'),dogX,0,0,tg);
@@ -993,10 +999,13 @@ function arcArrow(parent,x,R,col){const g=grp(parent,x);const m=new THREE.MeshBa
   const head=new THREE.Mesh(new THREE.ConeGeometry(.08,.2,14),m);head.position.set(R*Math.cos(e),R*Math.sin(e),0);head.rotation.z=e;
   const a=new THREE.Group();a.add(arc,head);a.rotation.y=Math.PI/2;g.add(a);g.visible=false;IDARROWS.push(g);return g;}
 arcArrow(G.in,-4.2,.32,IDC.in);arcArrow(G.cs,1.08,.32,IDC.cs);arcArrow(G.main,1.08,.3,IDC.out);arcArrow(G.main,4.25,.3,IDC.out);
-const IDM={in:PARTS.input.meshes,cs:[csShaft],out:[mainShaft,...splM,...PARTS.flange.meshes,...PARTS.prop.meshes]};
+const IDM={in:[...PARTS.input.meshes,...PARTS.ingear.meshes],cs:[csShaft],out:[mainShaft,spigot,...splM,...PARTS.flange.meshes,...PARTS.prop.meshes]};
 let ID=false;
 // everything except casing/oil takes emissive highlights and teaching colours
 const allMeshes=[];root.traverse(o=>{if(o.isMesh&&o.userData.part&&o.userData.part!=='oil')allMeshes.push(o);});
+let JOINT=false;const JCUT=[];inGearG.traverse(o=>{if(o.isMesh)JCUT.push(o);});PARTS.input.meshes.forEach(m=>JCUT.push(m));
+function jointCut(on){JOINT=on;for(const m of JCUT){m.material.clippingPlanes=on?CLIP:null;m.material.side=on?THREE.DoubleSide:(m.material.userData.side0??(m.material.userData.side0=m.material.side));m.material.needsUpdate=true;}}
+JCUT.forEach(m=>m.material.userData.side0=m.material.side);
 
 function synFocus(on){SYNF=on;for(const o of root.children)o.visible=on?!!o.userData.syn:true;for(const o of G.main.children)o.visible=on?!!o.userData.syn:true;
   IDARROWS.forEach(a=>a.visible=ID&&!on);if(!on){SYN_T=0;}$('cSyn').setAttribute('aria-pressed',String(on));}
@@ -1034,6 +1043,7 @@ const VIEWS={
   exp:{p:[-.8,3.9,16.8],t:[-.9,-.7,0]},
   syn:{p:[.6,1.3,3.6],t:[-.15,.15,0]},
   synx:{p:[.5,1.4,5.4],t:[-.15,.6,0]},
+  joint:{p:[-2.75,.45,2.75],t:[-2.95,-.05,0]},
   inmesh:{p:[-1.0,.3,5.0],t:[-3.0,-.75,0]},
   lever:{p:[1.6,3.4,3.4],t:[-.15,2.2,0]},
 };
@@ -1112,6 +1122,10 @@ const dirTxt=v=>Math.abs(v)<15?'ઊભો ⏸':v>0?'↻':'↺ ઊલટી દ�
 olab('big','#16a34a',G.in,[-4.25,-.78,.3],'id',()=>'① ઇનપુટ શાફ્ટ · એન્જિનથી પાવર આવે · '+Math.round(Math.abs(s.I))+' rpm '+dirTxt(s.I));
 olab('big','#2563eb',G.cs,[1.08,-.62,0],'id',()=>'② કાઉન્ટર શાફ્ટ · '+Math.round(Math.abs(s.I*18/32))+' rpm '+dirTxt(-s.I));
 olab('big','#dc2626',G.main,[4.3,.72,0],'id',()=>'③ આઉટપુટ શાફ્ટ → વ્હીલ · '+Math.round(Math.abs(outRpm()))+' rpm '+dirTxt(outRpm()));
+olab('syn','#16a34a',root,[-3.35,-.58,.4],'joint',()=>'① ઇનપુટ ગિયર (કાપેલો): પાછળ ખાડો · '+Math.round(Math.abs(s.I))+' rpm');
+olab('syn','#dc2626',root,[-2.45,.45,.4],'joint',()=>'③ આઉટપુટ શાફ્ટનો પાતળો છેડો ખાડામાં · '+Math.round(Math.abs(outRpm()))+' rpm');
+olab('syn','#6b7280',root,[-2.92,.3,.45],'joint','પાઇલટ નીડલ બેરિંગ');
+olab('syn','#0e7490',root,[-2.15,-.58,.4],'joint',()=>s.gear==='4'?'3–4 સ્લીવ ① અને ③ ને જોડે છે (4થો ગિયર)':'3–4 સ્લીવ (ચોથા ગિયરમાં ① + ③ જોડે)');
 olab('big','#ca8a04',root,[-2.88,.0,.8],'idj','↓ અહીં અંદર ① અને ③ અલગ (પાઇલટ બેરિંગ)');
 olab('syn','#0e7490',slvG.h12,[0,0,.62],'syn','સ્લીવ: અંદર સ્પ્લાઇન દાંત, બહાર ફોર્કનો ખાંચો');
 olab('syn','#6b7280',forkG.h12,[0,1.62,0],'syn','શિફ્ટ ફોર્ક (સ્લીવ ખસેડે)',1);
@@ -1126,7 +1140,7 @@ olab('syn','#ea580c',mG['2'],[0,-1.05,0],'syn','ગિયર 2 (છૂટો ફ
 olab('syn','#e11d48',mG['1'],[0,-1.25,0],'syn','ગિયર 1 (છૂટો ફરે)');
 olab('syn','#6b7280',mainShaft,[.55,-.3,.35],'syn','નીડલ બેરિંગ',1);
 let LAB_ON=true;const vtmp=new THREE.Vector3();
-function updateLabels(){const mode=SYNF?(SYN>.6?'syn':'none'):ID?'id':'norm';minis.hidden=!LAB_ON&&mode==='norm'||mode==='none';if(minis.hidden)return;const w=view.clientWidth,h=view.clientHeight;
+function updateLabels(){const mode=SYNF?(SYN>.6?'syn':'none'):JOINT?'joint':ID?'id':'norm';minis.hidden=!LAB_ON&&mode==='norm'||mode==='none';if(minis.hidden)return;const w=view.clientWidth,h=view.clientHeight;
   const narrow=w<520;
   for(const L of LABS){const lm=L.mode||(L.id?'gear':'norm');
     const show=lm==='gear'?(mode==='norm'||mode==='id')&&EXP<.05&&LAB_ON:lm==='idj'?mode==='id'&&EXP<.05:lm==='id'?mode==='id':lm===mode&&(lm!=='norm'||(!narrow&&EXP<.05));
@@ -1198,7 +1212,7 @@ function animateModel(dt,now){
   // emissive: power flow, sync heat, selection
   const fst=flowState();
   if(FLOW&&fst!==flowKey){flowKey=fst;buildFlow(fst);toast('⚡ '+flowMsg(fst));}
-  flowG.visible=FLOW&&!SYNF&&EXP<.05;if(flowG.visible)for(const tx of FLOWTEX)tx.offset.x-=dt/(s.slow?.2:1)*1.6;
+  flowG.visible=FLOW&&!SYNF&&!JOINT&&EXP<.05;if(flowG.visible)for(const tx of FLOWTEX)tx.offset.x-=dt/(s.slow?.2:1)*1.6;
   const tags=FLOW?(fst==='neutral'?NEUTRAL_TAGS:pathTags()):null;const engGlow=FLOW&&fst!=='off';const pulse=.5+.5*Math.sin(now/180);const c=coup(s.p);
   const syncId=(s.phase==='sync'||s.phase==='grind')?s.shiftFor:null;const heat=syncId?clamp(Math.abs(outRpm()*GD[syncId].r-s.I)/1500,.25,1):0;
   const hlOn=SEL&&(performance.now()<selUntil||GAME.flash);
@@ -1333,7 +1347,10 @@ let CLOCK=false;
 $('cLock').onclick=()=>{ac();SND.click();CLOCK=!CLOCK;$('cLock').setAttribute('aria-pressed',String(CLOCK));toast(CLOCK?'ક્લચ દબાયેલો રહેશે. હવે ગિયર પસંદ કરો.':'ક્લચ છૂટો (ધીમે ધીમે ઉપર આવશે)');};
 $('cCase').onclick=()=>{ac();SND.click();CASE_MODE=(CASE_MODE+1)%3;$('cCase').textContent=CASE_TXT[CASE_MODE];applyCase();};
 chip('cId',on=>{ID=on;teachApply();if(on){if(SYNF)synFocus(false);toast('લીલો = ઇનપુટ, વાદળી = કાઉન્ટર, લાલ = આઉટપુટ શાફ્ટ. તીર ફરે તો શાફ્ટ ફરે છે.');}});
-chip('cSyn',on=>{if(on){EXP_T=0;setChip('cExp',false);synFocus(true);SYN_T=1;camTouched=false;camTo('synx');toast('ફક્ત 1–2 સિંક્રો: દરેક ભાગ પર નામ લખ્યું છે');}else{synFocus(false);camTo('home');}});
+chip('cJoint',on=>{if(on){if(SYNF)synFocus(false);EXP_T=0;setChip('cExp',false);J_ID=ID;A.id(true);jointCut(true);camTouched=false;camTo('joint');toast('ઇનપુટ ગિયર અડધો કાપ્યો: આઉટપુટ શાફ્ટનો છેડો તેના ખાડામાં નીડલ બેરિંગ પર ફરે છે');}
+  else{jointCut(false);A.id(J_ID);camTo('home');}});
+let J_ID=false;
+chip('cSyn',on=>{if(on&&JOINT){jointCut(false);setChip('cJoint',false);}if(on){EXP_T=0;setChip('cExp',false);synFocus(true);SYN_T=1;camTouched=false;camTo('synx');toast('ફક્ત 1–2 સિંક્રો: દરેક ભાગ પર નામ લખ્યું છે');}else{synFocus(false);camTo('home');}});
 chip('cExp',on=>{if(on&&SYNF)synFocus(false);EXP_T=on?1:0;camTouched=false;camTo(on?'exp':'home');toast(on?'છૂટું દૃશ્ય: દરેક ભાગ અલગ દેખાય છે':'ભાગ પાછા જોડાઈ ગયા');});
 chip('cLab',on=>{LAB_ON=on;});
 chip('cFlow',on=>{FLOW=on;flowKey='';if(!on)buildFlow('off');});
@@ -1357,7 +1374,7 @@ const A={
   free(){s.hold=null;},
   part(id){SEL=id;selUntil=0;renderInsp();GAME.flash=id;setTimeout(()=>{if(GAME.flash===id)GAME.flash=null;},4500);},
   id(on){ID=on;setChip('cId',on);teachApply();},flow(on){FLOW=on;flowKey='';if(!on)buildFlow('off');setChip('cFlow',on);},
-  exp(v){EXP_T=v;setChip('cExp',!!v);},synOpen(v){EXP_T=0;setChip('cExp',false);if(!SYNF)synFocus(true);SYN_T=v;},
+  exp(v){EXP_T=v;setChip('cExp',!!v);},joint(on){jointCut(on);setChip('cJoint',on);},synOpen(v){EXP_T=0;setChip('cExp',false);if(!SYNF)synFocus(true);SYN_T=v;},
 };
 const DEMOS={
  sync:[
@@ -1389,7 +1406,8 @@ const DEMOS={
   {t:'4. કાઉન્ટર શાફ્ટ ઉપરના બધા ગિયર ફેરવે છે',x:'કાઉન્ટર શાફ્ટના ગિયર ઉપરના ગિયર 1, 2, 3, 5 અને R ને હંમેશા ફેરવે છે (દરેક પર rpm લખેલી છે). પણ આ ગિયર આઉટપુટ શાફ્ટ પર નીડલ બેરિંગ પર છૂટા છે.',d:8,cam:'home',a(){A.part('g1');}},
   {t:'5. ③ આઉટપુટ શાફ્ટ (લાલ) હજી ઊભો છે!',x:'ગાડી ઊભી છે અને ગિયર ન્યૂટ્રલમાં છે. બધા ગિયર ફરે છે, પણ કોઈ ગિયર લાલ શાફ્ટ સાથે લૉક નથી, એટલે તે ફરતો નથી. આને જ ન્યૂટ્રલ કહે છે.',d:8,cam:'home',a(){A.part('main');}},
   {t:'① અને ③ એક જ લાઇનમાં, પણ અલગ શાફ્ટ',x:'ઇનપુટ અને આઉટપુટ શાફ્ટ એક સીધી લાઇનમાં છે પણ જોડાયેલા નથી. આઉટપુટ શાફ્ટનો આગળનો છેડો ઇનપુટ ગિયરની અંદર નીડલ બેરિંગ પર ફરે છે. છૂટું કરીને જુઓ: લીલો અને લાલ અલગ થઈ ગયા.',d:9,cam:'exp',a(){A.exp(1);}},
-  {t:'પાવર નીચે જાય અને પાછો ઉપર આવે',x:'પાવરનો રસ્તો: ① ઇનપુટ (ઉપર) → ② કાઉન્ટર શાફ્ટ (નીચે) → ગિયર (ઉપર) → સ્લીવ → ③ આઉટપુટ (ઉપર). ગિયરને આઉટપુટ શાફ્ટ સાથે જોડનાર કડી છે સ્લીવ.',d:8,cam:'home',a(){A.exp(0);}},
+  {t:'અંદર જુઓ: બંને શાફ્ટ કેવી રીતે બેઠા છે',x:'ઇનપુટ ગિયર અડધો કાપીને બતાવ્યો છે. ગિયરની પાછળ ખાડો (પોકેટ) છે. આઉટપુટ શાફ્ટનો પાતળો આગળનો છેડો (સ્પિગોટ) આ ખાડામાં નીડલ બેરિંગ પર બેસે છે. જુઓ: લીલો ગિયર ફરે છે અને લાલ શાફ્ટ ઊભો છે. આ બેરિંગ ફક્ત ટેકો આપે છે, પાવર આપતી નથી.',d:12,cam:'joint',a(){A.exp(0);A.joint(true);}},
+  {t:'પાવર નીચે જાય અને પાછો ઉપર આવે',x:'પાવરનો રસ્તો: ① ઇનપુટ (ઉપર) → ② કાઉન્ટર શાફ્ટ (નીચે) → ગિયર (ઉપર) → સ્લીવ → ③ આઉટપુટ (ઉપર). ગિયરને આઉટપુટ શાફ્ટ સાથે જોડનાર કડી છે સ્લીવ.',d:8,cam:'home',a(){A.joint(false);A.exp(0);}},
   {t:'6. સ્લીવ ગિયર 1 ને આઉટપુટ શાફ્ટ સાથે જોડે છે',x:'હબ સ્પ્લાઇનથી લાલ શાફ્ટ પર જડેલું છે, સ્લીવ હબ પર સરકે છે. ક્લચ દબાવી પહેલો ગિયર પસંદ કર્યો: ફોર્ક સ્લીવને જમણે ધકેલે છે અને સ્લીવ ગિયર 1 ના ડૉગ દાંતમાં ભરાય છે.',d:9,cam:'h12',a(){A.clutch(1);A.slow(true);A.part('sleeve');later(()=>A.gear('1'),900);}},
   {t:'7. હવે ③ આઉટપુટ શાફ્ટ ફરે છે',x:'ક્લચ ધીમે છોડ્યો અને રેસ આપી. નારંગી ચમકતા ભાગ પાવરનો રસ્તો છે: ગિયર 1 → સ્લીવ → હબ → સ્પ્લાઇન → લાલ આઉટપુટ શાફ્ટ → પ્રોપેલર શાફ્ટ → વ્હીલ.',d:9,cam:'home',a(){A.slow(false);A.flow(true);A.clutch(0);A.gas(.45);}},
   {t:'સાર: કોણ કોને ફેરવે છે?',x:'એન્જિન → ફ્લાયવ્હીલ → ક્લચ પ્લેટ → ① ઇનપુટ શાફ્ટ → ઇનપુટ ગિયર → ② કાઉન્ટર શાફ્ટ → ગિયર 1 → સ્લીવ → હબ → ③ આઉટપુટ શાફ્ટ → વ્હીલ.',d:10,cam:'home',a(){A.gas(.3);}},
@@ -1427,7 +1445,7 @@ function demoStart(k,course){ac();SND.click();if(GAME.on)gameStop();if(D.on)demo
   if(innerWidth<980)$('bay').scrollIntoView({behavior:reduceMotion?'auto':'smooth',block:'start'});}
 function demoGo(i){if(i>=D.list.length){const k=D.key,course=D.course;CH_DONE.add(k);demoStop();SND.win();const ni=CHAPTERS.findIndex(c=>c.k===k)+1;
     if(course&&ni<CHAPTERS.length){toast('આગળનું પ્રકરણ: '+CHAPTERS[ni].t);setTimeout(()=>{if(!D.on&&state.tab==='demo')demoStart(CHAPTERS[ni].k,true);},1600);}else toast('ડેમો પૂરો ✓');return;}D.i=clamp(i,0,D.list.length-1);const st=D.list[D.i];D.t=0;D.dur=st.d;st.a&&st.a();if(st.cam)camTo(st.cam);speak(st.t+'. '+st.x);}
-function demoStop(){if(!D.on)return;D.on=false;s.pDemo=null;s.thDemo=null;s.hold=null;if(SYNF)synFocus(false);if(EXP_T)A.exp(0);s.slow=false;setChip('cSlow',false);if(D.prev){A.id(D.prev.ID);A.flow(D.prev.FLOW);if(TEACH!==D.prev.TEACH)A.teach(D.prev.TEACH);}try{speechSynthesis.cancel();}catch(e){}}
+function demoStop(){if(!D.on)return;D.on=false;s.pDemo=null;s.thDemo=null;s.hold=null;if(JOINT)A.joint(false);if(SYNF)synFocus(false);if(EXP_T)A.exp(0);s.slow=false;setChip('cSlow',false);if(D.prev){A.id(D.prev.ID);A.flow(D.prev.FLOW);if(TEACH!==D.prev.TEACH)A.teach(D.prev.TEACH);}try{speechSynthesis.cancel();}catch(e){}}
 const CHAPTERS=[
   {k:'power',t:'પાવર ક્યાંથી ક્યાં જાય?',x:'3 શાફ્ટ ઓળખો: કોણ કોને ફેરવે છે'},
   {k:'synpart',t:'સિંક્રો ખોલીને જુઓ',x:'સ્પ્લાઇન, હબ, સ્લીવ, બ્લૉકર રિંગ, ડૉગ દાંત'},
@@ -1494,6 +1512,20 @@ function renderTheory(){
   sec(3,'ઇનપુટ અને આઉટપુટ શાફ્ટ એક લાઇનમાં કેમ?',
     '<p>હા, આ ડિઝાઇન સાચી છે. પાછળનાં વ્હીલથી ચાલતાં વાહનો (રિયર-વ્હીલ ડ્રાઇવ: જિપ્સી, બોલેરો, સ્કૉર્પિયો, ટ્રક, બસ) માં આવું <b>ઇનલાઇન 3-શાફ્ટ ગિયરબોક્સ</b> હોય છે. ઇનપુટ શાફ્ટ અને આઉટપુટ શાફ્ટ એક જ સીધી લાઇનમાં છે, પણ <b>બે અલગ શાફ્ટ</b> છે.</p>'+
     '<div class="two"><div class="tb" style="--c:#16a34a"><b>① ઇનપુટ શાફ્ટ (લીલો)</b><br>ક્લચ પ્લેટથી ફરે છે. એન્જિનનો પાવર ગિયરબોક્સમાં લાવે છે. છેડે 18 દાંતનો ગિયર.</div><div class="tb" style="--c:#2563eb"><b>② કાઉન્ટર શાફ્ટ (વાદળી)</b><br>નીચે. ઇનપુટ ગિયરથી ઊલટી દિશામાં ફરે અને ઉપરના બધા ગિયર ફેરવે.</div><div class="tb" style="--c:#dc2626"><b>③ આઉટપુટ શાફ્ટ (લાલ)</b><br>ઇનપુટની સીધી લાઇનમાં. તેનો આગળનો છેડો ઇનપુટ ગિયરની અંદર નીડલ બેરિંગ પર ફરે છે, એટલે બંને જુદી ઝડપે ફરી શકે. પ્રોપેલર શાફ્ટ દ્વારા વ્હીલ ફેરવે.</div></div>'+
+    '<p><b>બંને શાફ્ટ કેવી રીતે જોડાયેલા છે (કાપેલું ચિત્ર):</b></p>'+
+    '<div class="tbl"><svg viewBox="0 0 640 230" style="width:100%;min-width:480px;display:block" role="img" aria-label="ઇનપુટ અને આઉટપુટ શાફ્ટનું જોડાણ">'+
+    '<rect x="20" y="98" width="300" height="34" rx="4" fill="#16a34a" opacity=".85"/>'+
+    '<path d="M300 40h90v54h-38v42h38v54h-90z" fill="#16a34a" opacity=".55" stroke="#15803d" stroke-width="2"/>'+
+    '<rect x="352" y="104" width="40" height="22" fill="#dc2626"/><rect x="390" y="97" width="230" height="36" rx="4" fill="#dc2626" opacity=".85"/>'+
+    [358,368,378,388].map(x=>'<circle cx="'+x+'" cy="99" r="4" fill="#9aa3ab" stroke="#4b5563"/><circle cx="'+x+'" cy="131" r="4" fill="#9aa3ab" stroke="#4b5563"/>').join('')+
+    '<g font-family="Noto Sans Gujarati,sans-serif" font-size="14" font-weight="700" fill="currentColor">'+
+    '<text x="30" y="88">① ઇનપુટ શાફ્ટ (ક્લચથી)</text><text x="292" y="30">ઇનપુટ ગિયર 18 દાંત</text>'+
+    '<text x="440" y="88">③ આઉટપુટ શાફ્ટ (વ્હીલ તરફ)</text>'+
+    '<path d="M372 140 L420 190" stroke="currentColor" stroke-width="1.5"/><text x="424" y="198">પાઇલટ નીડલ બેરિંગ</text>'+
+    '<path d="M365 115 L250 190" stroke="currentColor" stroke-width="1.5"/><text x="70" y="208">ગિયરના ખાડામાં આઉટપુટ શાફ્ટનો છેડો</text>'+
+    '</g></svg></div>'+
+    '<p>બંને શાફ્ટ એકબીજાને ફક્ત <b>ટેકો</b> આપે છે, પાવર નહીં. તેથી ન્યૂટ્રલમાં ① ફરે અને ③ ઊભો રહી શકે. પાવર ત્યારે જ જાય જ્યારે સ્લીવ કોઈ ગિયરને ③ સાથે લૉક કરે.</p>'+
+    see('power','ડેમો જુઓ (3D માં ગિયર કાપીને બતાવ્યો છે)')+
     '<p><b>કોણ કોને ફેરવે છે:</b></p><div class="flow"><span>એન્જિન</span><i>→</i><span>ફ્લાયવ્હીલ</span><i>→</i><span>ક્લચ પ્લેટ</span><i>→</i><span style="color:#16a34a">① ઇનપુટ શાફ્ટ</span><i>→</i><span>ઇનપુટ ગિયર</span><i>→</i><span style="color:#2563eb">② કાઉન્ટર શાફ્ટ</span><i>→</i><span>ગિયર 1–5/R (છૂટા)</span><i>→</i><span>સ્લીવ</span><i>→</i><span>હબ</span><i>→</i><span style="color:#dc2626">③ આઉટપુટ શાફ્ટ</span><i>→</i><span>વ્હીલ</span></div>'+
     '<p>એટલે પાવર ઉપરથી <b>નીચે</b> કાઉન્ટર શાફ્ટમાં જાય અને પાછો <b>ઉપર</b> આઉટપુટ શાફ્ટમાં આવે. ફક્ત ચોથા ગિયરમાં સ્લીવ ① અને ③ ને સીધા જોડે છે (1 : 1).</p>'+
     '<div class="tb" style="--c:var(--mute)"><b>આગળનાં વ્હીલથી ચાલતી કાર</b> (ફ્રન્ટ-વ્હીલ ડ્રાઇવ: સ્વિફ્ટ, અલ્ટો વગેરે) માં <b>2-શાફ્ટ ટ્રાન્સઍક્સલ</b> હોય છે: ઇનપુટ અને આઉટપુટ શાફ્ટ બાજુ-બાજુમાં (સમાંતર), કાઉન્ટર શાફ્ટ નથી, અને આઉટપુટ સીધો ડિફરન્શિયલ ફેરવે છે. સિંક્રોનું કામ બંનેમાં સરખું જ છે.</div>'+
