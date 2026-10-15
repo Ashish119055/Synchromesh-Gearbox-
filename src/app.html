@@ -1135,6 +1135,30 @@ function updateLabels(){const mode=SYNF?(SYN>.6?'syn':'none'):ID?'id':'norm';min
 const VIS=.02;
 const ORANGE=new THREE.Color(0xff7a1a),PINK=new THREE.Color(0xd4147f),HOTC=new THREE.Color(0xff4d00);
 let FLOW=false;
+// power-flow state: how far the engine's power gets right now
+const ENG_PARTS=new Set(['fly','crank','ringgear','flybolt','dowel','press','diaphragm','cover','strap']);
+const NEUTRAL_TAGS=new Set(['in','cs','idler',...Object.keys(GD).flatMap(id=>['cg:'+id,'mg:'+id,'dog:'+id])]);
+function flowState(){if(!s.running)return 'off';if(coup(s.p)<.3)return 'clutch';return s.gear?'gear'+s.gear:'neutral';}
+const FLOW_MSG={off:'એન્જિન બંધ: પાવર નથી.',clutch:'ક્લચ દબાયેલો: પાવર ફ્લાયવ્હીલ સુધી જ, ગિયરબોક્સમાં નહીં.',neutral:'ન્યૂટ્રલ: પાવર ઇનપુટ → કાઉન્ટર શાફ્ટ → બધા ગિયર સુધી, પણ આઉટપુટ શાફ્ટ સુધી નહીં.'};
+const flowMsg=st=>FLOW_MSG[st]||(st==='gear4'?'ચોથો ગિયર: ઇનપુટ શાફ્ટ → સ્લીવ → સીધો આઉટપુટ શાફ્ટ → વ્હીલ.':NAME(st.slice(4))+': ઇનપુટ → કાઉન્ટર શાફ્ટ → ગિયર '+st.slice(4)+' → સ્લીવ → આઉટપુટ શાફ્ટ → વ્હીલ.');
+// moving chevron lines along the power path, drawn on top of the gears
+const flowTex=cvTex(128,32,(g,w,h)=>{g.fillStyle='#ff6a00';g.fillRect(0,0,w,h);g.fillStyle='#fff6c2';g.strokeStyle='#7a2a00';g.lineWidth=2.5;
+  for(let x=0;x<w;x+=64){g.beginPath();g.moveTo(x+10,3);g.lineTo(x+46,16);g.lineTo(x+10,29);g.lineTo(x+20,16);g.closePath();g.fill();g.stroke();}});
+flowTex.wrapS=THREE.RepeatWrapping;
+const flowG=grp(root);const FLOWTEX=[];let flowKey='';
+function flowLine(pts){const cp=new THREE.CurvePath();let len=0;for(let i=1;i<pts.length;i++){const a=new THREE.Vector3(...pts[i-1]),b=new THREE.Vector3(...pts[i]);cp.add(new THREE.LineCurve3(a,b));len+=a.distanceTo(b);}
+  const tx=flowTex.clone();tx.needsUpdate=true;tx.wrapS=THREE.RepeatWrapping;tx.repeat.set(len/.6,1);FLOWTEX.push(tx);
+  const m=new THREE.Mesh(new THREE.TubeGeometry(cp,Math.max(8,Math.round(len*14)),.12,10,false),new THREE.MeshBasicMaterial({map:tx,transparent:true,opacity:.95,depthTest:false,depthWrite:false}));m.renderOrder=20;flowG.add(m);}
+function buildFlow(st){flowG.children.slice().forEach(m=>{m.geometry.dispose();m.material.dispose();flowG.remove(m);});FLOWTEX.length=0;
+  if(st==='off')return;
+  flowLine([[-6.3,0,0],[-5.45,0,0]]);if(st==='clutch')return;
+  flowLine([[-5.45,0,0],[-3.05,0,0]]);
+  if(st==='gear4'){flowLine([[-3.05,0,0],[6.6,0,0]]);return;}
+  flowLine([[-3.05,0,0],[-3.05,CY,0]]);
+  if(st==='neutral'){flowLine([[-3.05,CY,0],[3.0,CY,0]]);for(const id of ['3','2','1','5'])flowLine([[GD[id].x,CY,0],[GD[id].x,-.32,0]]);flowLine([[3.0,CY,0],[3.0,IDP.y,IDP.z],[3.0,-.32,0]]);return;}
+  const g=st.slice(4),x=GD[g].x;flowLine([[-3.05,CY,0],[x,CY,0]]);
+  if(g==='R')flowLine([[x,CY,0],[x,IDP.y,IDP.z],[x,0,0]]);else flowLine([[x,CY,0],[x,0,0]]);
+  flowLine([[x,0,0],[6.6,0,0]]);}
 function pathTags(){if(!s.gear||coup(s.p)<.3||!s.running)return null;const g=s.gear,hb=GD[g].hub;
   if(g==='4')return new Set(['in','dog:4','hub:'+hb,'slv:'+hb,'main']);
   const t=new Set(['in','cg:4','cs','cg:'+g,'mg:'+g,'dog:'+g,'hub:'+hb,'slv:'+hb,'main']);if(g==='R')t.add('idler');return t;}
@@ -1164,11 +1188,14 @@ function animateModel(dt,now){
   slvG.h12.rotation.y=-SYN*.75;ringM['1'].grp.rotation.y=-SYN*.5;ringM['2'].grp.rotation.y=SYN*.5;
   caseG.visible=CASE_MODE!==2&&EXP<.15&&!SYNF;attG.visible=(CASE_MODE!==2||EXP>.15)&&!SYNF;floor.position.y=FLOOR_Y-EXP*.9;grid.position.y=floor.position.y+.002;
   // emissive: power flow, sync heat, selection
-  const tags=FLOW?pathTags():null;const pulse=.5+.5*Math.sin(now/180);const c=coup(s.p);
+  const fst=flowState();
+  if(FLOW&&fst!==flowKey){flowKey=fst;buildFlow(fst);toast('⚡ '+flowMsg(fst));}
+  flowG.visible=FLOW&&!SYNF&&EXP<.05;if(flowG.visible)for(const tx of FLOWTEX)tx.offset.x-=dt/(s.slow?.2:1)*1.6;
+  const tags=FLOW?(fst==='neutral'?NEUTRAL_TAGS:pathTags()):null;const engGlow=FLOW&&fst!=='off';const pulse=.5+.5*Math.sin(now/180);const c=coup(s.p);
   const syncId=(s.phase==='sync'||s.phase==='grind')?s.shiftFor:null;const heat=syncId?clamp(Math.abs(outRpm()*GD[syncId].r-s.I)/1500,.25,1):0;
   const hlOn=SEL&&(performance.now()<selUntil||GAME.flash);
   for(const m of allMeshes){const e=m.material.emissive;if(!e)continue;e.setRGB(0,0,0);let k=0;
-    if(tags&&m.userData.tags.some(t=>tags.has(t))){e.copy(ORANGE);k=.22+.18*c;}
+    if((tags&&m.userData.tags.some(t=>tags.has(t)))||(engGlow&&ENG_PARTS.has(m.userData.part))){e.copy(ORANGE);k=.4+.15*pulse;}
     if(syncId&&m.userData.tags.includes('ring:'+syncId)){e.copy(HOTC);k=heat*(s.phase==='grind'?1.1:.7)*(.7+.3*pulse);}
     if(hlOn&&m.userData.part===(GAME.flash||SEL)){e.copy(PINK);k=.35+.45*pulse;}
     m.material.emissiveIntensity=k;}
@@ -1301,7 +1328,7 @@ chip('cId',on=>{ID=on;teachApply();if(on){if(SYNF)synFocus(false);toast('લી�
 chip('cSyn',on=>{if(on){EXP_T=0;setChip('cExp',false);synFocus(true);SYN_T=1;camTouched=false;camTo('synx');toast('ફક્ત 1–2 સિંક્રો: દરેક ભાગ પર નામ લખ્યું છે');}else{synFocus(false);camTo('home');}});
 chip('cExp',on=>{if(on&&SYNF)synFocus(false);EXP_T=on?1:0;camTouched=false;camTo(on?'exp':'home');toast(on?'છૂટું દૃશ્ય: દરેક ભાગ અલગ દેખાય છે':'ભાગ પાછા જોડાઈ ગયા');});
 chip('cLab',on=>{LAB_ON=on;});
-chip('cFlow',on=>{FLOW=on;});
+chip('cFlow',on=>{FLOW=on;flowKey='';if(!on)buildFlow('off');});
 chip('cTeach',on=>{TEACH=on;teachApply();});
 chip('cSlow',on=>{s.slow=on;});
 chip('cSpin',on=>{controls.autoRotate=on;});
@@ -1321,7 +1348,7 @@ const A={
   show(g,E){s.hold=E||2200;s.sel=g;s.gear=g==='N'?0:g;s.phase='idle';s.shiftFor=0;for(const hb in HUBS)s.sleeve[hb]=0;if(g!=='N')s.sleeve[GD[g].hub]=LOCK*GD[g].side;s.lastSel=g==='N'?s.lastSel:g;},
   free(){s.hold=null;},
   part(id){SEL=id;selUntil=0;renderInsp();GAME.flash=id;setTimeout(()=>{if(GAME.flash===id)GAME.flash=null;},4500);},
-  id(on){ID=on;setChip('cId',on);teachApply();},flow(on){FLOW=on;setChip('cFlow',on);},
+  id(on){ID=on;setChip('cId',on);teachApply();},flow(on){FLOW=on;flowKey='';if(!on)buildFlow('off');setChip('cFlow',on);},
   exp(v){EXP_T=v;setChip('cExp',!!v);},synOpen(v){EXP_T=0;setChip('cExp',false);if(!SYNF)synFocus(true);SYN_T=v;},
 };
 const DEMOS={
