@@ -1217,7 +1217,7 @@ function animateModel(dt,now){
   const syncId=(s.phase==='sync'||s.phase==='grind')?s.shiftFor:null;const heat=syncId?clamp(Math.abs(outRpm()*GD[syncId].r-s.I)/1500,.25,1):0;
   const hlOn=SEL&&(performance.now()<selUntil||GAME.flash);
   for(const m of allMeshes){const e=m.material.emissive;if(!e)continue;e.setRGB(0,0,0);let k=0;
-    if((tags&&m.userData.tags.some(t=>tags.has(t)))||(engGlow&&ENG_PARTS.has(m.userData.part))){e.copy(ORANGE);k=.4+.15*pulse;}
+    if((tags&&m.userData.tags.some(t=>tags.has(t)))||(engGlow&&ENG_PARTS.has(m.userData.part))){e.copy(ORANGE);k=.16+.08*pulse;}
     if(syncId&&m.userData.tags.includes('ring:'+syncId)){e.copy(HOTC);k=heat*(s.phase==='grind'?1.1:.7)*(.7+.3*pulse);}
     if(hlOn&&m.userData.part===(GAME.flash||SEL)){e.copy(PINK);k=.35+.45*pulse;}
     m.material.emissiveIntensity=k;}
